@@ -37,5 +37,19 @@ echo "6. Emptying & Deleting S3 Buckets..."
 aws s3 rb "s3://${SOURCE_BUCKET}" --force --region "${AWS_REGION}" || true
 aws s3 rb "s3://${SUPP_BUCKET}" --force --region "${AWS_REGION}" || true
 
+# --- Guardrail Cleanup (Preserved by Default) ---
+# Why preserved:
+#   1. Guardrail xojv3g7paumh existed before this experiment and is reused across labs.
+#   2. Bedrock Guardrails have $0 idle/storage cost (billed only per text unit evaluated).
+#
+# Future instructions:
+#   - If you switched deploy.sh to create a new Guardrail per run, uncomment the generic
+#     command below (uses GUARDRAIL_ID saved in .env.lab):
+#     aws bedrock delete-guardrail --guardrail-identifier "${GUARDRAIL_ID}" --region "${AWS_REGION}" || true
+#
+#   - Or to explicitly delete the original pre-existing Guardrail (note: deploy.sh expects it
+#     unless you also switch deploy.sh to create-guardrail):
+#     aws bedrock delete-guardrail --guardrail-identifier "xojv3g7paumh" --region "${AWS_REGION}" || true
+
 rm -f .env.lab
-echo "=== Teardown Complete! Existing Guardrail (xojv3g7paumh) was preserved. ==="
+echo "=== Teardown Complete! Guardrail (${GUARDRAIL_ID:-xojv3g7paumh}) was preserved. ==="

@@ -5,8 +5,31 @@ export AWS_REGION="eu-west-1"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 SUFFIX=$(date +%s)
 
+# --- Guardrail Configuration ---
+# By default, this lab reuses the pre-existing Bedrock Guardrail (xojv3g7paumh, $0 idle cost).
+# Future instructions: If you want deploy.sh to create a brand-new Guardrail for each run:
+#   1. Comment out GUARDRAIL_ID="xojv3g7paumh" below.
+#   2. Uncomment the `aws bedrock create-guardrail` block below.
+#   3. Optionally uncomment the Guardrail delete line in teardown.sh so it gets cleaned up.
 GUARDRAIL_ID="xojv3g7paumh"
 GUARDRAIL_VERSION="DRAFT"
+
+# GUARDRAIL_ID=$(aws bedrock create-guardrail \
+#   --name "bedrock-rag-guardrail-${SUFFIX}" \
+#   --description "RAG chatbot guardrail for prompt/response safety" \
+#   --blocked-input-messaging "Sorry, I cannot process this request due to safety policies." \
+#   --blocked-outputs-messaging "Sorry, I cannot provide that response due to safety policies." \
+#   --content-policy-config '{
+#     "filtersConfig": [
+#       {"type": "SEXUAL", "inputStrength": "HIGH", "outputStrength": "HIGH"},
+#       {"type": "VIOLENCE", "inputStrength": "HIGH", "outputStrength": "HIGH"},
+#       {"type": "HATE", "inputStrength": "HIGH", "outputStrength": "HIGH"},
+#       {"type": "INSULTS", "inputStrength": "HIGH", "outputStrength": "HIGH"},
+#       {"type": "MISCONDUCT", "inputStrength": "HIGH", "outputStrength": "HIGH"},
+#       {"type": "PROMPT_ATTACK", "inputStrength": "HIGH", "outputStrength": "NONE"}
+#     ]
+#   }' \
+#   --query 'guardrailId' --output text --region "${AWS_REGION}")
 
 SOURCE_BUCKET="bedrock-rag-docs-${ACCOUNT_ID}-${SUFFIX}"
 SUPP_BUCKET="bedrock-rag-bda-supp-${ACCOUNT_ID}-${SUFFIX}"
@@ -223,6 +246,7 @@ SUPP_BUCKET=${SUPP_BUCKET}
 VECTOR_BUCKET=${VECTOR_BUCKET}
 VECTOR_INDEX=${VECTOR_INDEX}
 KB_ID=${KB_ID}
+GUARDRAIL_ID=${GUARDRAIL_ID}
 KB_ROLE_NAME=${KB_ROLE_NAME}
 LAMBDA_ROLE_NAME=${LAMBDA_ROLE_NAME}
 LAMBDA_NAME=${LAMBDA_NAME}
