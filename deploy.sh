@@ -205,7 +205,7 @@ cat > /tmp/lambda-policy.json <<EOT
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": ["bedrock:RetrieveAndGenerate", "bedrock:Retrieve", "bedrock:InvokeModel", "bedrock:ApplyGuardrail"],
+      "Action": ["bedrock:RetrieveAndGenerate", "bedrock:Retrieve", "bedrock:InvokeModel", "bedrock:GetInferenceProfile", "bedrock:ApplyGuardrail"],
       "Resource": "*"
     },
     {
