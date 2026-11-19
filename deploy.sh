@@ -1,6 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Ask which API Gateway stage to deploy to (or accept as first argument: ./deploy.sh dev)
+STAGE="${1:-}"
+if [ -z "${STAGE}" ]; then
+  read -r -p "Enter API Gateway stage to deploy to (e.g. dev, staging, prod) [prod]: " STAGE
+  STAGE="${STAGE:-prod}"
+fi
+
+if [[ ! "${STAGE}" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+  echo "Error: Stage name '${STAGE}' must contain only letters, numbers, hyphens, or underscores."
+  exit 1
+fi
+echo "Deploying to stage: ${STAGE}"
+
 export AWS_REGION="eu-west-1"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 SUFFIX=$(date +%s)
@@ -230,17 +243,18 @@ aws apigateway put-integration --rest-api-id "${API_ID}" --resource-id "${RESOUR
 
 aws lambda add-permission --function-name "${LAMBDA_NAME}" --statement-id "apigw-invoke" --action "lambda:InvokeFunction" --principal apigateway.amazonaws.com --source-arn "arn:aws:execute-api:${AWS_REGION}:${ACCOUNT_ID}:${API_ID}/*/POST/chat" --region "${AWS_REGION}" >/dev/null
 
-aws apigateway create-deployment --rest-api-id "${API_ID}" --stage-name "prod" --region "${AWS_REGION}" >/dev/null
+aws apigateway create-deployment --rest-api-id "${API_ID}" --stage-name "${STAGE}" --region "${AWS_REGION}" >/dev/null
 
 API_KEY_ID=$(aws apigateway create-api-key --name "${API_NAME}-key" --enabled --query 'id' --output text --region "${AWS_REGION}")
 API_KEY_VAL=$(aws apigateway get-api-key --api-key "${API_KEY_ID}" --include-value --query 'value' --output text --region "${AWS_REGION}")
-PLAN_ID=$(aws apigateway create-usage-plan --name "${API_NAME}-plan" --throttle rateLimit=5,burstLimit=10 --quota limit=1000,period=DAY --api-stages apiId="${API_ID}",stage=prod --query 'id' --output text --region "${AWS_REGION}")
+PLAN_ID=$(aws apigateway create-usage-plan --name "${API_NAME}-plan" --throttle rateLimit=5,burstLimit=10 --quota limit=1000,period=DAY --api-stages apiId="${API_ID}",stage="${STAGE}" --query 'id' --output text --region "${AWS_REGION}")
 aws apigateway create-usage-plan-key --usage-plan-id "${PLAN_ID}" --key-id "${API_KEY_ID}" --key-type API_KEY --region "${AWS_REGION}" >/dev/null
 
-API_URL="https://${API_ID}.execute-api.${AWS_REGION}.amazonaws.com/prod/chat"
+API_URL="https://${API_ID}.execute-api.${AWS_REGION}.amazonaws.com/${STAGE}/chat"
 
 cat > .env.lab <<EOT
 AWS_REGION=${AWS_REGION}
+STAGE=${STAGE}
 SOURCE_BUCKET=${SOURCE_BUCKET}
 SUPP_BUCKET=${SUPP_BUCKET}
 VECTOR_BUCKET=${VECTOR_BUCKET}

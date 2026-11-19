@@ -10,9 +10,11 @@ Serverless Retrieval-Augmented Generation (RAG) chatbot built on Amazon Bedrock 
 ## Usage
 
 1. Place 1–2 short PDF white papers into `docs/`.
-2. Deploy the stack:
+2. Deploy the stack (prompts for an API Gateway stage such as `dev`, `staging`, or `prod`, defaulting to `prod`, or pass it directly):
    ```bash
    ./deploy.sh
+   # or skip the prompt:
+   ./deploy.sh dev
    ```
 3. Export the `RAG_API_URL` and `RAG_API_KEY` printed at the end of `deploy.sh`, then start chatting:
    ```bash
@@ -22,3 +24,18 @@ Serverless Retrieval-Augmented Generation (RAG) chatbot built on Amazon Bedrock 
    ```bash
    ./teardown.sh
    ```
+
+## Stages
+
+- **Run in a different stage:** Pass the stage name to `./deploy.sh` (e.g. `./deploy.sh dev` or `./deploy.sh staging`) or enter it when prompted. Note that `./deploy.sh` creates a new timestamped stack each time and overwrites `.env.lab`, so run `./teardown.sh` before deploying another stack—or back up `.env.lab` per stage (e.g. `.env.lab.dev`).
+- **Find available stages:**
+  - **AWS Console (`eu-west-1`):** Open **API Gateway** → select your API (`bedrock-rag-api-*`) → click **Stages** in the left sidebar.
+  - **AWS CLI:**
+    ```bash
+    source .env.lab
+    aws apigateway get-stages --rest-api-id "${API_ID}" --region "${AWS_REGION}" --query 'item[].stageName' --output table
+    ```
+  - **Check your current `.env.lab` stage:**
+    ```bash
+    grep STAGE .env.lab
+    ```
