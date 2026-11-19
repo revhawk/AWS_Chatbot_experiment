@@ -1,5 +1,6 @@
 .env.lab
 .env.lab.*
+.venv/
 docs/*.pdf
 __pycache__/
 *.pyc
