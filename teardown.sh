@@ -11,9 +11,10 @@ echo "=== Starting Teardown in ${AWS_REGION} ==="
 
 echo "1. Deleting API Gateway, Usage Plan & API Key..."
 aws apigateway delete-usage-plan-key --usage-plan-id "${PLAN_ID}" --key-id "${API_KEY_ID}" --region "${AWS_REGION}" || true
+aws apigateway update-usage-plan --usage-plan-id "${PLAN_ID}" --patch-operations "op=remove,path=/apiStages,value=${API_ID}:${STAGE:-prod}" --region "${AWS_REGION}" >/dev/null || true
+aws apigateway delete-rest-api --rest-api-id "${API_ID}" --region "${AWS_REGION}" || true
 aws apigateway delete-usage-plan --usage-plan-id "${PLAN_ID}" --region "${AWS_REGION}" || true
 aws apigateway delete-api-key --api-key "${API_KEY_ID}" --region "${AWS_REGION}" || true
-aws apigateway delete-rest-api --rest-api-id "${API_ID}" --region "${AWS_REGION}" || true
 
 echo "2. Deleting Lambda Function & IAM Role..."
 aws lambda delete-function --function-name "${LAMBDA_NAME}" --region "${AWS_REGION}" || true
