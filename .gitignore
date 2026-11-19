@@ -1,4 +1,6 @@
 .env.lab
+.env.lab.*
+docs/*.pdf
 __pycache__/
 *.pyc
 *.zip
