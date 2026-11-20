@@ -1,6 +1,7 @@
 .env.lab
 .env.lab.*
 config.env
+logs/
 .venv/
 app_docs/*.pdf
 __pycache__/

@@ -67,6 +67,7 @@ if ! ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/d
 fi
 
 SUFFIX=$(date +%s)
+init_run_log "deploy" "${FULL_PREFIX}"
 RESOURCE_GROUP_NAME="${FULL_PREFIX}-${STAGE}-${SUFFIX}"
 SOURCE_BUCKET="${FULL_PREFIX}-docs-${ACCOUNT_ID}-${SUFFIX}"
 SUPP_BUCKET="${FULL_PREFIX}-bda-supp-${ACCOUNT_ID}-${SUFFIX}"

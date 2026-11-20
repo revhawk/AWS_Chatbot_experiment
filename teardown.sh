@@ -16,6 +16,7 @@ fi
 
 # shellcheck disable=SC1091
 source .env.lab
+init_run_log "teardown" "${PREFIX:-lab}-${APP_NAME:-bedrock-rag}"
 echo "=== Starting Teardown in ${AWS_REGION} ==="
 
 teardown_compute_api

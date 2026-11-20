@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 # Shared helpers for deploy.sh, teardown.sh, and scripts/*.sh
 
+init_run_log() {
+  local action="$1"
+  local prefix="$2"
+  local stamp
+  stamp=$(date -u +%Y%m%dT%H%M%SZ)
+  mkdir -p "${SCRIPT_DIR}/logs"
+  LOG_FILE="${SCRIPT_DIR}/logs/${prefix}-${action}-${stamp}.log"
+  exec > >(tee -a "${LOG_FILE}") 2>&1
+  echo "Logging ${action} run to ${LOG_FILE}"
+}
+
 require_cmd() {
   local cmd="$1"
   if ! command -v "${cmd}" >/dev/null 2>&1; then
