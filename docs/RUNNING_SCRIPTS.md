@@ -15,23 +15,29 @@ This guide covers how to run the deployment and teardown scripts using **Podman*
 
 ## 2. Option A — Run via Podman (Recommended, Zero Host Installs)
 
-1. Start an ephemeral `amazon/aws-cli` container mounting your project and `~/.aws`:
+1. Clone the repository (if you haven't already) and enter the project folder:
    ```bash
-   cd /home/reg/Coding/AWS_chatbot_experiment
-
-   podman run --rm -it --entrypoint bash \
+   git clone https://github.com/revhawk/AWS_Chatbot_experiment.git
+   cd AWS_Chatbot_experiment
+   ```
+2. Build the Podman image once (includes AWS CLI v2 + `zip`):
+   ```bash
+   podman build -t aws-rag-cli .
+   ```
+3. Start the ephemeral container mounting your project and `~/.aws`:
+   ```bash
+   podman run --rm -it \
      -v "$PWD:/work:Z" \
      -v "$HOME/.aws:/root/.aws:Z" \
      -w /work \
-     docker.io/amazon/aws-cli:latest
+     aws-rag-cli
    ```
-2. Inside the container, install `zip` (vanishes on `exit`) and authenticate with temporary Console credentials (use `--remote` inside Podman so it doesn't try to redirect to `127.0.0.1` inside the container):
+4. Inside the container, authenticate with temporary Console credentials (use `--remote` inside Podman so it doesn't try to redirect to `127.0.0.1` inside the container):
    ```bash
-   yum install -y zip >/dev/null
    aws login --remote
    ```
    *(Or use `aws sso login` / `aws configure` if you use IAM Identity Center or IAM keys. Credentials are saved to `~/.aws` on your host.)*
-3. Deploy (prompts for stage: `dev`, `staging`, or `prod` [default: `prod`], and memory mode: `single` or `multi` [default: `single`]):
+5. Deploy (prompts for stage: `dev`, `staging`, or `prod` [default: `prod`], and memory mode: `single` or `multi` [default: `single`]):
    ```bash
    ./deploy.sh
    # or skip the prompts: ./deploy.sh dev multi
