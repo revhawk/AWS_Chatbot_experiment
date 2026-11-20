@@ -46,31 +46,85 @@ if ! ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/d
 fi
 SUFFIX=$(date +%s)
 
-# --- Guardrail Configuration ---
-# By default, this lab reuses the pre-existing Bedrock Guardrail (xojv3g7paumh, $0 idle cost).
-# Future instructions: If you want deploy.sh to create a brand-new Guardrail for each run:
-#   1. Comment out GUARDRAIL_ID="xojv3g7paumh" below.
-#   2. Uncomment the `aws bedrock create-guardrail` block below.
-#   3. Optionally uncomment the Guardrail delete line in teardown.sh so it gets cleaned up.
-GUARDRAIL_ID="xojv3g7paumh"
+# --- Guardrail Configuration (Creates a copy of Foul_Language_Blocker per run) ---
+# To reuse an existing Guardrail instead, comment out the create-guardrail block below
+# and set GUARDRAIL_ID="<your-guardrail-id>".
+GUARDRAIL_NAME="Foul_Language_Blocker-${SUFFIX}"
 GUARDRAIL_VERSION="DRAFT"
 
-# GUARDRAIL_ID=$(aws bedrock create-guardrail \
-#   --name "bedrock-rag-guardrail-${SUFFIX}" \
-#   --description "RAG chatbot guardrail for prompt/response safety" \
-#   --blocked-input-messaging "Sorry, I cannot process this request due to safety policies." \
-#   --blocked-outputs-messaging "Sorry, I cannot provide that response due to safety policies." \
-#   --content-policy-config '{
-#     "filtersConfig": [
-#       {"type": "SEXUAL", "inputStrength": "HIGH", "outputStrength": "HIGH"},
-#       {"type": "VIOLENCE", "inputStrength": "HIGH", "outputStrength": "HIGH"},
-#       {"type": "HATE", "inputStrength": "HIGH", "outputStrength": "HIGH"},
-#       {"type": "INSULTS", "inputStrength": "HIGH", "outputStrength": "HIGH"},
-#       {"type": "MISCONDUCT", "inputStrength": "HIGH", "outputStrength": "HIGH"},
-#       {"type": "PROMPT_ATTACK", "inputStrength": "HIGH", "outputStrength": "NONE"}
-#     ]
-#   }' \
-#   --query 'guardrailId' --output text --region "${AWS_REGION}")
+echo "=== 0. Creating Bedrock Guardrail (${GUARDRAIL_NAME}) ==="
+cat > /tmp/guardrail-content.json <<'EOT'
+{
+  "filtersConfig": [
+    {"type": "VIOLENCE", "inputStrength": "HIGH", "outputStrength": "HIGH", "inputModalities": ["TEXT"], "outputModalities": ["TEXT"], "inputAction": "BLOCK", "outputAction": "BLOCK"},
+    {"type": "PROMPT_ATTACK", "inputStrength": "HIGH", "outputStrength": "NONE", "inputAction": "BLOCK"},
+    {"type": "MISCONDUCT", "inputStrength": "HIGH", "outputStrength": "HIGH", "inputModalities": ["TEXT"], "outputModalities": ["TEXT"], "inputAction": "BLOCK", "outputAction": "BLOCK"},
+    {"type": "HATE", "inputStrength": "HIGH", "outputStrength": "HIGH", "inputModalities": ["TEXT"], "outputModalities": ["TEXT"], "inputAction": "BLOCK", "outputAction": "BLOCK"},
+    {"type": "SEXUAL", "inputStrength": "HIGH", "outputStrength": "HIGH", "inputModalities": ["TEXT"], "outputModalities": ["TEXT"], "inputAction": "BLOCK", "outputAction": "BLOCK"},
+    {"type": "INSULTS", "inputStrength": "HIGH", "outputStrength": "HIGH", "inputModalities": ["TEXT"], "outputModalities": ["TEXT"], "inputAction": "BLOCK", "outputAction": "BLOCK"}
+  ],
+  "tierConfig": {"tierName": "CLASSIC"}
+}
+EOT
+
+cat > /tmp/guardrail-words.json <<'EOT'
+{
+  "wordsConfig": [
+    {"text": "Poo", "inputAction": "BLOCK", "outputAction": "BLOCK", "inputEnabled": true, "outputEnabled": true}
+  ],
+  "managedWordListsConfig": [
+    {"type": "PROFANITY", "inputAction": "BLOCK", "outputAction": "BLOCK", "inputEnabled": true, "outputEnabled": true}
+  ]
+}
+EOT
+
+cat > /tmp/guardrail-pii.json <<'EOT'
+{
+  "piiEntitiesConfig": [
+    {"type": "NAME", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "PHONE", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "EMAIL", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "ADDRESS", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "AGE", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "USERNAME", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "PASSWORD", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "DRIVER_ID", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "LICENSE_PLATE", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "VEHICLE_IDENTIFICATION_NUMBER", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "CREDIT_DEBIT_CARD_CVV", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "CREDIT_DEBIT_CARD_EXPIRY", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "CREDIT_DEBIT_CARD_NUMBER", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "PIN", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "INTERNATIONAL_BANK_ACCOUNT_NUMBER", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "SWIFT_CODE", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "IP_ADDRESS", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "MAC_ADDRESS", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "URL", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "AWS_ACCESS_KEY", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "AWS_SECRET_KEY", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "US_PASSPORT_NUMBER", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "US_SOCIAL_SECURITY_NUMBER", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "US_INDIVIDUAL_TAX_IDENTIFICATION_NUMBER", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "US_BANK_ACCOUNT_NUMBER", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "US_BANK_ROUTING_NUMBER", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "CA_HEALTH_NUMBER", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "CA_SOCIAL_INSURANCE_NUMBER", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "UK_UNIQUE_TAXPAYER_REFERENCE_NUMBER", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "UK_NATIONAL_INSURANCE_NUMBER", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true},
+    {"type": "UK_NATIONAL_HEALTH_SERVICE_NUMBER", "action": "ANONYMIZE", "inputAction": "ANONYMIZE", "outputAction": "ANONYMIZE", "inputEnabled": true, "outputEnabled": true}
+  ]
+}
+EOT
+
+GUARDRAIL_ID=$(aws bedrock create-guardrail \
+  --name "${GUARDRAIL_NAME}" \
+  --description "Blocks all foul language" \
+  --blocked-input-messaging "Sorry, the model cannot answer this question, please stop using foul language." \
+  --blocked-outputs-messaging "Sorry, the model cannot answer this question, please stop using foul language." \
+  --content-policy-config file:///tmp/guardrail-content.json \
+  --word-policy-config file:///tmp/guardrail-words.json \
+  --sensitive-information-policy-config file:///tmp/guardrail-pii.json \
+  --query 'guardrailId' --output text --region "${AWS_REGION}")
 
 SOURCE_BUCKET="bedrock-rag-docs-${ACCOUNT_ID}-${SUFFIX}"
 SUPP_BUCKET="bedrock-rag-bda-supp-${ACCOUNT_ID}-${SUFFIX}"
