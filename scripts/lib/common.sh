@@ -23,8 +23,8 @@ require_cmd() {
 validate_slug() {
   local value="$1"
   local label="$2"
-  if [[ ! "${value}" =~ ^[a-z0-9-]+$ ]]; then
-    echo "Error: ${label} '${value}' must contain only lowercase letters, numbers, or hyphens."
+  if [[ ! "${value}" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+    echo "Error: ${label} '${value}' must contain only lowercase letters, numbers, and single hyphens (no leading/trailing/double hyphens)."
     exit 1
   fi
 }

@@ -47,9 +47,11 @@ if [[ "${MEMORY_MODE}" != "single" && "${MEMORY_MODE}" != "multi" ]]; then
 fi
 
 prompt_var APP_NAME "Enter a main project name for all resources (lowercase, hyphens ok)" "bedrock-rag"
+APP_NAME=$(echo "${APP_NAME}" | sed 's/^-*//;s/-*$//' | tr -s '-')
 validate_slug "${APP_NAME}" "Project name"
 
 prompt_var PREFIX "Enter a prefix for all resources (lowercase, hyphens ok)" "lab"
+PREFIX=$(echo "${PREFIX}" | sed 's/^-*//;s/-*$//' | tr -s '-')
 validate_slug "${PREFIX}" "Prefix"
 
 prompt_var TAG_COST_CENTRE "Enter tag value for 'CostCentre'" "IT"
