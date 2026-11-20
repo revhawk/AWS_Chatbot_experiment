@@ -9,7 +9,7 @@ This guide covers how to run the deployment and teardown scripts using **Podman*
 - **Billing & Guardrail:**
   - Ensure your AWS account has a valid payment method under **Billing and Cost Management → Payment preferences**.
   - Ensure Bedrock Guardrail `xojv3g7paumh` exists in `eu-west-1` (or uncomment the `create-guardrail` block in `deploy.sh`).
-- **PDF documents:** Place 1–2 short PDFs in `docs/` (ignored by Git via `.gitignore`).
+- **PDF documents:** Place 1–2 short PDFs in `app_docs/` (ignored by Git via `.gitignore`).
 
 ---
 
@@ -68,7 +68,7 @@ This guide covers how to run the deployment and teardown scripts using **Podman*
    git clone https://github.com/revhawk/AWS_Chatbot_experiment.git
    cd AWS_Chatbot_experiment
    ```
-3. Upload your PDFs into `docs/` (CloudShell **Actions → Upload file**), then run `./deploy.sh`.
+3. Upload your PDFs into `app_docs/` (CloudShell **Actions → Upload file**), then run `./deploy.sh`.
 4. Copy the printed `export RAG_API_URL=...` and `export RAG_API_KEY=...` into your **local terminal** and run `python3 chat_cli.py`.
 5. When done, run `./teardown.sh` in CloudShell.
 

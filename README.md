@@ -9,7 +9,7 @@ Serverless Retrieval-Augmented Generation (RAG) chatbot built on Amazon Bedrock 
 
 ## Usage
 
-1. Place 1–2 short PDF white papers into `docs/`.
+1. Place 1–2 short PDF white papers into `app_docs/`.
 2. Deploy the stack (prompts for an API Gateway stage and conversation memory mode `single` or `multi`, or pass them directly):
    ```bash
    ./deploy.sh
@@ -42,8 +42,8 @@ Serverless Retrieval-Augmented Generation (RAG) chatbot built on Amazon Bedrock 
 
 ## Documentation
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) — Architectural decisions and system diagram
-- [RUNNING_SCRIPTS.md](RUNNING_SCRIPTS.md) — Podman, CloudShell, and local deployment instructions
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — Architectural decisions and system diagram
+- [docs/RUNNING_SCRIPTS.md](docs/RUNNING_SCRIPTS.md) — Podman, CloudShell, and local deployment instructions
 
 ## License
 

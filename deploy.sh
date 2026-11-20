@@ -87,8 +87,8 @@ echo "=== 1. Creating S3 Source & Supplemental Buckets (SSE-S3 Managed Encryptio
 aws s3 mb "s3://${SOURCE_BUCKET}" --region "${AWS_REGION}"
 aws s3 mb "s3://${SUPP_BUCKET}" --region "${AWS_REGION}"
 
-if [ -d "./docs" ] && [ -n "$(find ./docs -maxdepth 1 -type f ! -name '.gitkeep')" ]; then
-  aws s3 cp ./docs/ "s3://${SOURCE_BUCKET}/" --recursive --exclude ".gitkeep"
+if [ -d "./app_docs" ] && [ -n "$(find ./app_docs -maxdepth 1 -type f ! -name '.gitkeep')" ]; then
+  aws s3 cp ./app_docs/ "s3://${SOURCE_BUCKET}/" --recursive --exclude ".gitkeep"
 fi
 
 echo "=== 2. Creating S3 Vectors Bucket & Index (1024 dims for Titan Embed v2) ==="
@@ -199,7 +199,7 @@ DS_ID=$(aws bedrock-agent create-data-source \
   }' \
   --query 'dataSource.dataSourceId' --output text --region "${AWS_REGION}")
 
-if [ -d "./docs" ] && [ -n "$(find ./docs -maxdepth 1 -type f ! -name '.gitkeep')" ]; then
+if [ -d "./app_docs" ] && [ -n "$(find ./app_docs -maxdepth 1 -type f ! -name '.gitkeep')" ]; then
   aws bedrock-agent start-ingestion-job --knowledge-base-id "${KB_ID}" --data-source-id "${DS_ID}" --region "${AWS_REGION}" >/dev/null
   echo "Started BDA ingestion job for uploaded documents."
 fi
