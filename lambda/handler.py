@@ -4,6 +4,7 @@ import os
 import uuid
 from datetime import datetime, timezone
 import boto3
+from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 
 logger = logging.getLogger()
@@ -20,6 +21,8 @@ MODEL_ARN = os.environ["MODEL_ARN"]
 GUARDRAIL_ID = os.environ["GUARDRAIL_ID"]
 GUARDRAIL_VERSION = os.environ["GUARDRAIL_VERSION"]
 KB_MODE = os.environ.get("KB_MODE", "vector").lower()
+MEMORY_MODE = os.environ.get("MEMORY_MODE", "single").lower()
+HISTORY_LIMIT = int(os.environ.get("HISTORY_LIMIT", "6"))
 
 
 def _json_response(status_code, payload):
@@ -30,10 +33,36 @@ def _json_response(status_code, payload):
     }
 
 
-def _query_vector_kb(prompt):
+def _load_history(session_id):
+    """Load the most recent turns for a session from DynamoDB in chronological order."""
+    if MEMORY_MODE != "multi":
+        return []
+    try:
+        resp = table.query(
+            KeyConditionExpression=Key("session_id").eq(session_id),
+            ScanIndexForward=False,
+            Limit=HISTORY_LIMIT,
+        )
+        items = resp.get("Items", [])
+        items.reverse()
+        return items
+    except ClientError:
+        logger.exception("Failed to load chat history for session %s", session_id)
+        return []
+
+
+def _query_vector_kb(prompt, history):
     """Query a vector-store Knowledge Base (e.g. S3 Vectors) via retrieve_and_generate."""
+    query_text = prompt
+    if history:
+        turns = "\n".join(
+            f"User: {item.get('prompt', '')}\nAssistant: {item.get('answer', '')}"
+            for item in history
+        )
+        query_text = f"Conversation history:\n{turns}\n\nCurrent question: {prompt}"
+
     response = bedrock_agent.retrieve_and_generate(
-        input={"text": prompt},
+        input={"text": query_text},
         retrieveAndGenerateConfiguration={
             "type": "KNOWLEDGE_BASE",
             "knowledgeBaseConfiguration": {
@@ -60,7 +89,7 @@ def _query_vector_kb(prompt):
     return answer, guardrail_action, sources
 
 
-def _query_managed_kb(prompt):
+def _query_managed_kb(prompt, history):
     """Query a Managed Knowledge Base via retrieve + converse."""
     retrieval = bedrock_agent.retrieve(
         knowledgeBaseId=KB_ID,
@@ -84,25 +113,32 @@ def _query_managed_kb(prompt):
 
     context_block = "\n\n---\n\n".join(chunks) if chunks else "No relevant documents found."
 
+    messages = []
+    for item in history:
+        if item.get("prompt"):
+            messages.append({"role": "user", "content": [{"text": item["prompt"]}]})
+        if item.get("answer"):
+            messages.append({"role": "assistant", "content": [{"text": item["answer"]}]})
+
+    messages.append(
+        {
+            "role": "user",
+            "content": [{"text": f"Context:\n{context_block}\n\nQuestion: {prompt}"}],
+        }
+    )
+
     converse_resp = bedrock_runtime.converse(
         modelId=MODEL_ARN,
         system=[
             {
                 "text": (
                     "You are a helpful assistant. Answer the user's question using only "
-                    "the provided knowledge base context. If the context does not contain "
-                    "the answer, say you do not have enough information."
+                    "the provided knowledge base context and prior conversation history. "
+                    "If the context does not contain the answer, say you do not have enough information."
                 )
             }
         ],
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {"text": f"Context:\n{context_block}\n\nQuestion: {prompt}"}
-                ],
-            }
-        ],
+        messages=messages,
         guardrailConfig={
             "guardrailIdentifier": GUARDRAIL_ID,
             "guardrailVersion": GUARDRAIL_VERSION,
@@ -134,11 +170,13 @@ def lambda_handler(event, context):
     if not prompt:
         return _json_response(400, {"error": "prompt is required"})
 
+    history = _load_history(session_id)
+
     try:
         if KB_MODE == "managed":
-            answer, guardrail_action, sources = _query_managed_kb(prompt)
+            answer, guardrail_action, sources = _query_managed_kb(prompt, history)
         elif KB_MODE == "vector":
-            answer, guardrail_action, sources = _query_vector_kb(prompt)
+            answer, guardrail_action, sources = _query_vector_kb(prompt, history)
         else:
             return _json_response(500, {"error": f"Unsupported KB_MODE: {KB_MODE}"})
     except ClientError as exc:

@@ -10,11 +10,11 @@ Serverless Retrieval-Augmented Generation (RAG) chatbot built on Amazon Bedrock 
 ## Usage
 
 1. Place 1–2 short PDF white papers into `docs/`.
-2. Deploy the stack (prompts for an API Gateway stage such as `dev`, `staging`, or `prod`, defaulting to `prod`, or pass it directly):
+2. Deploy the stack (prompts for an API Gateway stage and conversation memory mode `single` or `multi`, or pass them directly):
    ```bash
    ./deploy.sh
-   # or skip the prompt:
-   ./deploy.sh dev
+   # or skip the prompts:
+   ./deploy.sh dev multi
    ```
 3. Export the `RAG_API_URL` and `RAG_API_KEY` printed at the end of `deploy.sh`, then start chatting:
    ```bash

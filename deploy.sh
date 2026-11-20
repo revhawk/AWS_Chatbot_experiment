@@ -14,6 +14,23 @@ if [[ ! "${STAGE}" =~ ^[a-zA-Z0-9_-]+$ ]]; then
 fi
 echo "Deploying to stage: ${STAGE}"
 
+# Ask whether to enable multi-turn conversation memory (or accept as second argument: ./deploy.sh dev multi)
+MEMORY_MODE="${2:-}"
+if [ -z "${MEMORY_MODE}" ]; then
+  echo ""
+  echo "Conversation memory mode:"
+  echo "  single - Each question is answered independently (no prior chat history sent; lower token cost)."
+  echo "  multi  - Loads recent session turns from DynamoDB so you can ask follow-up questions."
+  read -r -p "Choose memory mode (single/multi) [single]: " MEMORY_MODE
+  MEMORY_MODE="${MEMORY_MODE:-single}"
+fi
+MEMORY_MODE=$(echo "${MEMORY_MODE}" | tr '[:upper:]' '[:lower:]')
+if [[ "${MEMORY_MODE}" != "single" && "${MEMORY_MODE}" != "multi" ]]; then
+  echo "Error: Memory mode '${MEMORY_MODE}' must be 'single' or 'multi'."
+  exit 1
+fi
+echo "Using memory mode: ${MEMORY_MODE}"
+
 export AWS_REGION="eu-west-1"
 
 for cmd in aws zip; do
@@ -241,7 +258,7 @@ LAMBDA_ARN=$(aws lambda create-function \
   --zip-file fileb:///tmp/lambda.zip \
   --timeout 30 \
   --memory-size 256 \
-  --environment "Variables={KB_ID=${KB_ID},MODEL_ARN=arn:aws:bedrock:${AWS_REGION}:${ACCOUNT_ID}:inference-profile/eu.amazon.nova-micro-v1:0,GUARDRAIL_ID=${GUARDRAIL_ID},GUARDRAIL_VERSION=${GUARDRAIL_VERSION},TABLE_NAME=${DDB_TABLE}}" \
+  --environment "Variables={KB_ID=${KB_ID},MODEL_ARN=arn:aws:bedrock:${AWS_REGION}:${ACCOUNT_ID}:inference-profile/eu.amazon.nova-micro-v1:0,GUARDRAIL_ID=${GUARDRAIL_ID},GUARDRAIL_VERSION=${GUARDRAIL_VERSION},TABLE_NAME=${DDB_TABLE},MEMORY_MODE=${MEMORY_MODE}}" \
   --query 'FunctionArn' --output text --region "${AWS_REGION}")
 
 echo "=== 7. Creating API Gateway REST API + API Key ==="
@@ -266,6 +283,7 @@ API_URL="https://${API_ID}.execute-api.${AWS_REGION}.amazonaws.com/${STAGE}/chat
 cat > .env.lab <<EOT
 AWS_REGION=${AWS_REGION}
 STAGE=${STAGE}
+MEMORY_MODE=${MEMORY_MODE}
 SOURCE_BUCKET=${SOURCE_BUCKET}
 SUPP_BUCKET=${SUPP_BUCKET}
 VECTOR_BUCKET=${VECTOR_BUCKET}

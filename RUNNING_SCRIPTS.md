@@ -31,11 +31,13 @@ This guide covers how to run the deployment and teardown scripts using **Podman*
    aws login --remote
    ```
    *(Or use `aws sso login` / `aws configure` if you use IAM Identity Center or IAM keys. Credentials are saved to `~/.aws` on your host.)*
-3. Deploy (prompts for stage: `dev`, `staging`, or `prod` [default: `prod`]):
+3. Deploy (prompts for stage: `dev`, `staging`, or `prod` [default: `prod`], and memory mode: `single` or `multi` [default: `single`]):
    ```bash
    ./deploy.sh
-   # or skip the prompt: ./deploy.sh dev
+   # or skip the prompts: ./deploy.sh dev multi
    ```
+   - **`single`:** Each question is answered independently (no prior chat history sent; lower token cost).
+   - **`multi`:** Loads the last 6 turns for the `session_id` from DynamoDB so you can ask follow-up questions.
 4. Wait ~1–3 minutes for Bedrock Data Automation (BDA) ingestion to finish, then check status:
    ```bash
    source .env.lab
