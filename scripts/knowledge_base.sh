@@ -91,8 +91,19 @@ EOT
     --query 'dataSource.dataSourceId' --output text --region "${AWS_REGION}")
 
   if [ -d "./app_docs" ] && [ -n "$(find ./app_docs -maxdepth 1 -type f ! -name '.gitkeep')" ]; then
-    aws bedrock-agent start-ingestion-job --knowledge-base-id "${KB_ID}" --data-source-id "${DS_ID}" --region "${AWS_REGION}" >/dev/null
-    echo "Started BDA ingestion job for uploaded documents."
+    JOB_ID=$(aws bedrock-agent start-ingestion-job --knowledge-base-id "${KB_ID}" --data-source-id "${DS_ID}" --query 'ingestionJob.ingestionJobId' --output text --region "${AWS_REGION}")
+    echo "Waiting for BDA ingestion job (${JOB_ID}) to complete..."
+    for _ in $(seq 1 30); do
+      JOB_STATUS=$(aws bedrock-agent get-ingestion-job --knowledge-base-id "${KB_ID}" --data-source-id "${DS_ID}" --ingestion-job-id "${JOB_ID}" --query 'ingestionJob.status' --output text --region "${AWS_REGION}")
+      if [ "${JOB_STATUS}" = "COMPLETE" ]; then
+        echo "BDA ingestion complete!"
+        break
+      elif [ "${JOB_STATUS}" = "FAILED" ]; then
+        echo "Warning: BDA ingestion job failed. Check Bedrock Knowledge Base console for details."
+        break
+      fi
+      sleep 10
+    done
   fi
 }
 

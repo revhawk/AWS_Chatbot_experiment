@@ -117,6 +117,8 @@ PLAN_ID=${PLAN_ID}
 EOT
 
 echo ""
-echo "Deployment complete! Run these exports to test with chat_cli.py:"
+echo "Deployment complete! Run these commands in your host terminal to start chatting:"
+echo "cd \"${SCRIPT_DIR}\""
 echo "export RAG_API_URL=\"${API_URL}\""
 echo "export RAG_API_KEY=\"${API_KEY_VAL}\""
+echo "python3 chat_cli.py"
