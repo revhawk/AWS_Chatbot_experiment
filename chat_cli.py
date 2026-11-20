@@ -15,7 +15,12 @@ session_id = None
 print("Connected to Bedrock Knowledge Base. Type 'exit' to quit.\n")
 
 while True:
-    prompt = input("You: ").strip()
+    try:
+        prompt = input("You: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print("\nExiting.")
+        break
+
     if prompt.lower() in {"exit", "quit"}:
         break
     if not prompt:
@@ -36,7 +41,13 @@ while True:
         with urllib.request.urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
-        print(f"HTTP Error {e.code}: {e.read().decode('utf-8')}")
+        print(f"HTTP Error {e.code}: {e.read().decode('utf-8', errors='replace')}")
+        continue
+    except (urllib.error.URLError, TimeoutError) as e:
+        print(f"Network/Timeout Error: {e}")
+        continue
+    except json.JSONDecodeError:
+        print("Error: Received non-JSON response from API.")
         continue
 
     session_id = data.get("session_id", session_id)

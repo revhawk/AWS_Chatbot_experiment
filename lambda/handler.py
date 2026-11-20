@@ -1,8 +1,13 @@
 import json
+import logging
 import os
 import uuid
 from datetime import datetime, timezone
 import boto3
+from botocore.exceptions import ClientError
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 AWS_REGION = os.environ["AWS_REGION"]
 bedrock_agent = boto3.client("bedrock-agent-runtime", region_name=AWS_REGION)
@@ -15,6 +20,14 @@ MODEL_ARN = os.environ["MODEL_ARN"]
 GUARDRAIL_ID = os.environ["GUARDRAIL_ID"]
 GUARDRAIL_VERSION = os.environ["GUARDRAIL_VERSION"]
 KB_MODE = os.environ.get("KB_MODE", "vector").lower()
+
+
+def _json_response(status_code, payload):
+    return {
+        "statusCode": status_code,
+        "headers": {"Content-Type": "application/json"},
+        "body": json.dumps(payload),
+    }
 
 
 def _query_vector_kb(prompt):
@@ -107,38 +120,56 @@ def _query_managed_kb(prompt):
 
 
 def lambda_handler(event, context):
-    body = json.loads(event.get("body") or "{}")
-    prompt = body.get("prompt", "").strip()
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except json.JSONDecodeError:
+        return _json_response(400, {"error": "Invalid JSON in request body"})
+
+    if not isinstance(body, dict):
+        return _json_response(400, {"error": "Request body must be a JSON object"})
+
+    prompt = str(body.get("prompt", "")).strip()
     session_id = body.get("session_id") or str(uuid.uuid4())
 
     if not prompt:
-        return {"statusCode": 400, "body": json.dumps({"error": "prompt is required"})}
+        return _json_response(400, {"error": "prompt is required"})
 
-    if KB_MODE == "managed":
-        answer, guardrail_action, sources = _query_managed_kb(prompt)
-    else:
-        answer, guardrail_action, sources = _query_vector_kb(prompt)
+    try:
+        if KB_MODE == "managed":
+            answer, guardrail_action, sources = _query_managed_kb(prompt)
+        elif KB_MODE == "vector":
+            answer, guardrail_action, sources = _query_vector_kb(prompt)
+        else:
+            return _json_response(500, {"error": f"Unsupported KB_MODE: {KB_MODE}"})
+    except ClientError as exc:
+        err = exc.response.get("Error", {})
+        code = err.get("Code", "ClientError")
+        msg = err.get("Message", str(exc))
+        logger.exception("Bedrock call failed (%s): %s", code, msg)
+        status = 429 if code == "ThrottlingException" else 502
+        return _json_response(status, {"error": code, "message": msg})
 
-    table.put_item(
-        Item={
-            "session_id": session_id,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "prompt": prompt,
-            "answer": answer,
-            "guardrail_action": guardrail_action,
-            "sources": sources,
-        }
-    )
-
-    return {
-        "statusCode": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps(
-            {
+    try:
+        table.put_item(
+            Item={
                 "session_id": session_id,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "prompt": prompt,
                 "answer": answer,
                 "guardrail_action": guardrail_action,
                 "sources": sources,
             }
-        ),
-    }
+        )
+    except ClientError:
+        # Don't fail the user's chat response if audit logging has a transient error
+        logger.exception("Failed to write chat turn to DynamoDB for session %s", session_id)
+
+    return _json_response(
+        200,
+        {
+            "session_id": session_id,
+            "answer": answer,
+            "guardrail_action": guardrail_action,
+            "sources": sources,
+        },
+    )

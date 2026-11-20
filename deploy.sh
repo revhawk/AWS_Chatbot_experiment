@@ -15,7 +15,18 @@ fi
 echo "Deploying to stage: ${STAGE}"
 
 export AWS_REGION="eu-west-1"
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+for cmd in aws zip; do
+  if ! command -v "${cmd}" >/dev/null 2>&1; then
+    echo "Error: '${cmd}' is required but not installed. See RUNNING_SCRIPTS.md."
+    exit 1
+  fi
+done
+
+if ! ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text 2>/dev/null); then
+  echo "Error: AWS CLI is not authenticated. Run 'aws login --remote' (Podman) or 'aws sso login' first."
+  exit 1
+fi
 SUFFIX=$(date +%s)
 
 # --- Guardrail Configuration ---

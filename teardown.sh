@@ -16,8 +16,9 @@ aws apigateway delete-rest-api --rest-api-id "${API_ID}" --region "${AWS_REGION}
 aws apigateway delete-usage-plan --usage-plan-id "${PLAN_ID}" --region "${AWS_REGION}" || true
 aws apigateway delete-api-key --api-key "${API_KEY_ID}" --region "${AWS_REGION}" || true
 
-echo "2. Deleting Lambda Function & IAM Role..."
+echo "2. Deleting Lambda Function, Log Group & IAM Role..."
 aws lambda delete-function --function-name "${LAMBDA_NAME}" --region "${AWS_REGION}" || true
+aws logs delete-log-group --log-group-name "/aws/lambda/${LAMBDA_NAME}" --region "${AWS_REGION}" || true
 aws iam detach-role-policy --role-name "${LAMBDA_ROLE_NAME}" --policy-arn "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole" || true
 aws iam delete-role-policy --role-name "${LAMBDA_ROLE_NAME}" --policy-name "LambdaRagPolicy" || true
 aws iam delete-role --role-name "${LAMBDA_ROLE_NAME}" || true
