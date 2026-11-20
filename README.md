@@ -7,6 +7,19 @@ Serverless Retrieval-Augmented Generation (RAG) chatbot built on Amazon Bedrock 
 - **AWS Lambda + API Gateway (REST + API Key)** for serverless inference
 - **Amazon DynamoDB (On-Demand)** for session chat history and audit logging
 
+## Architecture
+
+```mermaid
+flowchart LR
+    CLI["chat_cli.py (Local Terminal)"] -->|"POST /chat + x-api-key"| APIGW["API Gateway REST (Stage: dev / staging / prod)"]
+    APIGW -->|"Lambda Proxy"| LAMBDA["AWS Lambda (Python 3.12 / 3.15)"]
+    LAMBDA -->|"KB_MODE=vector / managed"| KB["Bedrock Knowledge Base (Titan Embed v2 + BDA)"]
+    KB <-->|"1024-dim Cosine"| VEC["Amazon S3 Vectors (AES256)"]
+    KB <-->|"PDFs & BDA Output"| S3["Amazon S3 Buckets (SSE-S3)"]
+    KB -->|"Filter"| GR["Bedrock Guardrail"]
+    LAMBDA <-->|"History (multi) + Audit"| DDB["Amazon DynamoDB (On-Demand)"]
+```
+
 ## Usage
 
 1. Place 1–2 short PDF white papers into `app_docs/`.

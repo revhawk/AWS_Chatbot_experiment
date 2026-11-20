@@ -18,17 +18,19 @@ Serverless RAG chatbot over AI white paper PDFs in AWS `eu-west-1` with $0 idle 
 
 ```mermaid
 flowchart LR
-    CLI["chat_cli.py<br/>(Local Terminal)"] -->|"POST /chat + x-api-key"| APIGW["API Gateway REST<br/>(Stage: dev / staging / prod)"]
-    APIGW -->|"Lambda Proxy"| LAMBDA["AWS Lambda<br/>(Python 3.12 / 3.15)"]
+    CLI["chat_cli.py (Local Terminal)"] -->|"POST /chat + x-api-key"| APIGW["API Gateway REST (Stage: dev / staging / prod)"]
+    APIGW -->|"Lambda Proxy"| LAMBDA["AWS Lambda (Python 3.12 / 3.15)"]
 
-    LAMBDA -->|"KB_MODE=vector<br/>RetrieveAndGenerate"| KB["Bedrock Knowledge Base<br/>(Titan Embed v2 + BDA)"]
-    LAMBDA -->|"KB_MODE=managed<br/>Retrieve + Converse"| KB
+    LAMBDA -->|"KB_MODE=vector: RetrieveAndGenerate"| KB["Bedrock Knowledge Base (Titan Embed v2 + BDA)"]
+    LAMBDA -->|"KB_MODE=managed: Retrieve + Converse"| KB
 
-    KB <-->|"1024-dim Cosine"| VEC["Amazon S3 Vectors<br/>(AES256)"]
-    KB <-->|"Source PDFs & BDA Output"| S3["Amazon S3 Buckets<br/>(SSE-S3 AES256)"]
-    KB -->|"Input / Output Filter"| GR["Bedrock Guardrail<br/>(xojv3g7paumh / DRAFT)"]
+    KB <-->|"1024-dim Cosine"| VEC["Amazon S3 Vectors (AES256)"]
+    KB <-->|"Source PDFs & BDA Output"| S3["Amazon S3 Buckets (SSE-S3 AES256)"]
+    KB -->|"Input / Output Filter"| GR["Bedrock Guardrail (Content, Profanity, 31 PII)"]
     LAMBDA -->|"Converse Guardrail"| GR
-    LAMBDA -->|"PutItem Audit Log"| DDB["Amazon DynamoDB<br/>(BedrockChatHistory, On-Demand)"]
+    LAMBDA <-->|"Query (MEMORY_MODE=multi) + PutItem"| DDB["Amazon DynamoDB (On-Demand)"]
+
+    DEPLOY["deploy.sh / teardown.sh + config.env"] -.->|"Tags (Name, Project, Stage, CostCentre, ResourceID)"| RG["AWS Resource Group"]
 ```
 
 ## Repo Files
