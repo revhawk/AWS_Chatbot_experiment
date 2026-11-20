@@ -31,7 +31,7 @@ if [[ "${MEMORY_MODE}" != "single" && "${MEMORY_MODE}" != "multi" ]]; then
 fi
 echo "Using memory mode: ${MEMORY_MODE}"
 
-# Ask for a main project/app name prefix used on all resources and tags (or 3rd arg: ./deploy.sh dev multi my-bot)
+# Ask for a resource prefix and main project name (or 3rd/4th args: ./deploy.sh dev multi my-bot rvh)
 APP_NAME="${3:-}"
 if [ -z "${APP_NAME}" ]; then
   read -r -p "Enter a main project name for all resources (lowercase, hyphens ok) [bedrock-rag]: " APP_NAME
@@ -41,7 +41,26 @@ if [[ ! "${APP_NAME}" =~ ^[a-z0-9-]+$ ]]; then
   echo "Error: Project name '${APP_NAME}' must contain only lowercase letters, numbers, or hyphens (for S3 compatibility)."
   exit 1
 fi
-echo "Using project name: ${APP_NAME}"
+
+PREFIX="${4:-}"
+if [ -z "${PREFIX}" ]; then
+  read -r -p "Enter a prefix for all resources (lowercase, hyphens ok) [lab]: " PREFIX
+  PREFIX="${PREFIX:-lab}"
+fi
+if [[ ! "${PREFIX}" =~ ^[a-z0-9-]+$ ]]; then
+  echo "Error: Prefix '${PREFIX}' must contain only lowercase letters, numbers, or hyphens (for S3 compatibility)."
+  exit 1
+fi
+
+FULL_PREFIX="${PREFIX}-${APP_NAME}"
+echo "Using resource prefix: ${FULL_PREFIX}"
+
+# Ask about required tags (default: CostCentre=IT, ResourceID=001)
+read -r -p "Enter tag value for 'CostCentre' [IT]: " TAG_COST_CENTRE
+TAG_COST_CENTRE="${TAG_COST_CENTRE:-IT}"
+read -r -p "Enter tag value for 'ResourceID' [001]: " TAG_RESOURCE_ID
+TAG_RESOURCE_ID="${TAG_RESOURCE_ID:-001}"
+echo "Applying tags: Project=${APP_NAME}, Stage=${STAGE}, CostCentre=${TAG_COST_CENTRE}, ResourceID=${TAG_RESOURCE_ID}"
 
 export AWS_REGION="eu-west-1"
 
@@ -61,7 +80,7 @@ SUFFIX=$(date +%s)
 # --- Guardrail Configuration (Creates a copy of Foul_Language_Blocker per run) ---
 # To reuse an existing Guardrail instead, comment out the create-guardrail block below
 # and set GUARDRAIL_ID="<your-guardrail-id>".
-GUARDRAIL_NAME="${APP_NAME}-guardrail-${SUFFIX}"
+GUARDRAIL_NAME="${FULL_PREFIX}-guardrail-${SUFFIX}"
 GUARDRAIL_VERSION="DRAFT"
 
 echo "=== 0. Creating Bedrock Guardrail (${GUARDRAIL_NAME}) ==="
@@ -136,27 +155,27 @@ GUARDRAIL_ID=$(aws bedrock create-guardrail \
   --content-policy-config file:///tmp/guardrail-content.json \
   --word-policy-config file:///tmp/guardrail-words.json \
   --sensitive-information-policy-config file:///tmp/guardrail-pii.json \
-  --tags key=Project,value="${APP_NAME}" key=Stage,value="${STAGE}" key=Stack,value="${SUFFIX}" \
+  --tags key=Project,value="${APP_NAME}" key=Stage,value="${STAGE}" key=Stack,value="${SUFFIX}" key=CostCentre,value="${TAG_COST_CENTRE}" key=ResourceID,value="${TAG_RESOURCE_ID}" \
   --query 'guardrailId' --output text --region "${AWS_REGION}")
 
-RESOURCE_GROUP_NAME="${APP_NAME}-${STAGE}-${SUFFIX}"
+RESOURCE_GROUP_NAME="${FULL_PREFIX}-${STAGE}-${SUFFIX}"
 
-SOURCE_BUCKET="${APP_NAME}-docs-${ACCOUNT_ID}-${SUFFIX}"
-SUPP_BUCKET="${APP_NAME}-bda-supp-${ACCOUNT_ID}-${SUFFIX}"
-VECTOR_BUCKET="${APP_NAME}-vec-${SUFFIX}"
+SOURCE_BUCKET="${FULL_PREFIX}-docs-${ACCOUNT_ID}-${SUFFIX}"
+SUPP_BUCKET="${FULL_PREFIX}-bda-supp-${ACCOUNT_ID}-${SUFFIX}"
+VECTOR_BUCKET="${FULL_PREFIX}-vec-${SUFFIX}"
 VECTOR_INDEX="whitepapers-index"
-KB_NAME="${APP_NAME}-kb-${SUFFIX}"
-KB_ROLE_NAME="${APP_NAME}-kb-role-${SUFFIX}"
-LAMBDA_ROLE_NAME="${APP_NAME}-lambda-role-${SUFFIX}"
-LAMBDA_NAME="${APP_NAME}-chat-${SUFFIX}"
-DDB_TABLE="${APP_NAME}-history-${SUFFIX}"
-API_NAME="${APP_NAME}-api-${SUFFIX}"
+KB_NAME="${FULL_PREFIX}-kb-${SUFFIX}"
+KB_ROLE_NAME="${FULL_PREFIX}-kb-role-${SUFFIX}"
+LAMBDA_ROLE_NAME="${FULL_PREFIX}-lambda-role-${SUFFIX}"
+LAMBDA_NAME="${FULL_PREFIX}-chat-${SUFFIX}"
+DDB_TABLE="${FULL_PREFIX}-history-${SUFFIX}"
+API_NAME="${FULL_PREFIX}-api-${SUFFIX}"
 
 echo "=== 1. Creating S3 Source & Supplemental Buckets (SSE-S3 Managed Encryption) ==="
 aws s3 mb "s3://${SOURCE_BUCKET}" --region "${AWS_REGION}"
 aws s3 mb "s3://${SUPP_BUCKET}" --region "${AWS_REGION}"
-aws s3api put-bucket-tagging --bucket "${SOURCE_BUCKET}" --tagging "TagSet=[{Key=Project,Value=${APP_NAME}},{Key=Stage,Value=${STAGE}},{Key=Stack,Value=${SUFFIX}}]" --region "${AWS_REGION}"
-aws s3api put-bucket-tagging --bucket "${SUPP_BUCKET}" --tagging "TagSet=[{Key=Project,Value=${APP_NAME}},{Key=Stage,Value=${STAGE}},{Key=Stack,Value=${SUFFIX}}]" --region "${AWS_REGION}"
+aws s3api put-bucket-tagging --bucket "${SOURCE_BUCKET}" --tagging "TagSet=[{Key=Project,Value=${APP_NAME}},{Key=Stage,Value=${STAGE}},{Key=Stack,Value=${SUFFIX}},{Key=CostCentre,Value=${TAG_COST_CENTRE}},{Key=ResourceID,Value=${TAG_RESOURCE_ID}}]" --region "${AWS_REGION}"
+aws s3api put-bucket-tagging --bucket "${SUPP_BUCKET}" --tagging "TagSet=[{Key=Project,Value=${APP_NAME}},{Key=Stage,Value=${STAGE}},{Key=Stack,Value=${SUFFIX}},{Key=CostCentre,Value=${TAG_COST_CENTRE}},{Key=ResourceID,Value=${TAG_RESOURCE_ID}}]" --region "${AWS_REGION}"
 
 if [ -d "./app_docs" ] && [ -n "$(find ./app_docs -maxdepth 1 -type f ! -name '.gitkeep')" ]; then
   aws s3 cp ./app_docs/ "s3://${SOURCE_BUCKET}/" --recursive --exclude ".gitkeep"
@@ -197,7 +216,7 @@ cat > /tmp/kb-trust.json <<EOT
 }
 EOT
 
-KB_ROLE_ARN=$(aws iam create-role --role-name "${KB_ROLE_NAME}" --assume-role-policy-document file:///tmp/kb-trust.json --tags Key=Project,Value="${APP_NAME}" Key=Stage,Value="${STAGE}" Key=Stack,Value="${SUFFIX}" --query 'Role.Arn' --output text)
+KB_ROLE_ARN=$(aws iam create-role --role-name "${KB_ROLE_NAME}" --assume-role-policy-document file:///tmp/kb-trust.json --tags Key=Project,Value="${APP_NAME}" Key=Stage,Value="${STAGE}" Key=Stack,Value="${SUFFIX}" Key=CostCentre,Value="${TAG_COST_CENTRE}" Key=ResourceID,Value="${TAG_RESOURCE_ID}" --query 'Role.Arn' --output text)
 
 cat > /tmp/kb-policy.json <<EOT
 {
@@ -254,7 +273,7 @@ KB_ID=$(aws bedrock-agent create-knowledge-base \
       \"indexArn\": \"${VECTOR_INDEX_ARN}\"
     }
   }" \
-  --tags Project="${APP_NAME}",Stage="${STAGE}",Stack="${SUFFIX}" \
+  --tags Project="${APP_NAME}",Stage="${STAGE}",Stack="${SUFFIX}",CostCentre="${TAG_COST_CENTRE}",ResourceID="${TAG_RESOURCE_ID}" \
   --query 'knowledgeBase.knowledgeBaseId' --output text --region "${AWS_REGION}")
 
 DS_ID=$(aws bedrock-agent create-data-source \
@@ -282,7 +301,7 @@ aws dynamodb create-table \
   --attribute-definitions AttributeName=session_id,AttributeType=S AttributeName=timestamp,AttributeType=S \
   --key-schema AttributeName=session_id,KeyType=HASH AttributeName=timestamp,KeyType=RANGE \
   --billing-mode PAY_PER_REQUEST \
-  --tags Key=Project,Value="${APP_NAME}" Key=Stage,Value="${STAGE}" Key=Stack,Value="${SUFFIX}" \
+  --tags Key=Project,Value="${APP_NAME}" Key=Stage,Value="${STAGE}" Key=Stack,Value="${SUFFIX}" Key=CostCentre,Value="${TAG_COST_CENTRE}" Key=ResourceID,Value="${TAG_RESOURCE_ID}" \
   --region "${AWS_REGION}" >/dev/null
 
 echo "=== 6. Creating Lambda Execution Role & Function ==="
@@ -297,7 +316,7 @@ cat > /tmp/lambda-trust.json <<EOT
 }
 EOT
 
-LAMBDA_ROLE_ARN=$(aws iam create-role --role-name "${LAMBDA_ROLE_NAME}" --assume-role-policy-document file:///tmp/lambda-trust.json --tags Key=Project,Value="${APP_NAME}" Key=Stage,Value="${STAGE}" Key=Stack,Value="${SUFFIX}" --query 'Role.Arn' --output text)
+LAMBDA_ROLE_ARN=$(aws iam create-role --role-name "${LAMBDA_ROLE_NAME}" --assume-role-policy-document file:///tmp/lambda-trust.json --tags Key=Project,Value="${APP_NAME}" Key=Stage,Value="${STAGE}" Key=Stack,Value="${SUFFIX}" Key=CostCentre,Value="${TAG_COST_CENTRE}" Key=ResourceID,Value="${TAG_RESOURCE_ID}" --query 'Role.Arn' --output text)
 aws iam attach-role-policy --role-name "${LAMBDA_ROLE_NAME}" --policy-arn "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 
 cat > /tmp/lambda-policy.json <<EOT
@@ -332,11 +351,11 @@ LAMBDA_ARN=$(aws lambda create-function \
   --timeout 30 \
   --memory-size 256 \
   --environment "Variables={KB_ID=${KB_ID},MODEL_ARN=arn:aws:bedrock:${AWS_REGION}:${ACCOUNT_ID}:inference-profile/eu.amazon.nova-micro-v1:0,GUARDRAIL_ID=${GUARDRAIL_ID},GUARDRAIL_VERSION=${GUARDRAIL_VERSION},TABLE_NAME=${DDB_TABLE},MEMORY_MODE=${MEMORY_MODE}}" \
-  --tags Project="${APP_NAME}",Stage="${STAGE}",Stack="${SUFFIX}" \
+  --tags Project="${APP_NAME}",Stage="${STAGE}",Stack="${SUFFIX}",CostCentre="${TAG_COST_CENTRE}",ResourceID="${TAG_RESOURCE_ID}" \
   --query 'FunctionArn' --output text --region "${AWS_REGION}")
 
 echo "=== 7. Creating API Gateway REST API + API Key ==="
-API_ID=$(aws apigateway create-rest-api --name "${API_NAME}" --endpoint-configuration types=REGIONAL --tags Project="${APP_NAME}",Stage="${STAGE}",Stack="${SUFFIX}" --query 'id' --output text --region "${AWS_REGION}")
+API_ID=$(aws apigateway create-rest-api --name "${API_NAME}" --endpoint-configuration types=REGIONAL --tags Project="${APP_NAME}",Stage="${STAGE}",Stack="${SUFFIX}",CostCentre="${TAG_COST_CENTRE}",ResourceID="${TAG_RESOURCE_ID}" --query 'id' --output text --region "${AWS_REGION}")
 ROOT_ID=$(aws apigateway get-resources --rest-api-id "${API_ID}" --query 'items[0].id' --output text --region "${AWS_REGION}")
 RESOURCE_ID=$(aws apigateway create-resource --rest-api-id "${API_ID}" --parent-id "${ROOT_ID}" --path-part "chat" --query 'id' --output text --region "${AWS_REGION}")
 
@@ -363,14 +382,17 @@ cat > /tmp/resource-group-query.json <<EOT
 EOT
 aws resource-groups create-group \
   --name "${RESOURCE_GROUP_NAME}" \
-  --description "AWS Bedrock RAG Chatbot (${APP_NAME}, ${STAGE}, ${SUFFIX})" \
+  --description "AWS Bedrock RAG Chatbot (${FULL_PREFIX}, ${STAGE}, ${SUFFIX})" \
   --resource-query file:///tmp/resource-group-query.json \
-  --tags Project="${APP_NAME}",Stage="${STAGE}",Stack="${SUFFIX}" \
+  --tags Project="${APP_NAME}",Stage="${STAGE}",Stack="${SUFFIX}",CostCentre="${TAG_COST_CENTRE}",ResourceID="${TAG_RESOURCE_ID}" \
   --region "${AWS_REGION}" >/dev/null
 
 cat > .env.lab <<EOT
 AWS_REGION=${AWS_REGION}
 APP_NAME=${APP_NAME}
+PREFIX=${PREFIX}
+TAG_COST_CENTRE=${TAG_COST_CENTRE}
+TAG_RESOURCE_ID=${TAG_RESOURCE_ID}
 STAGE=${STAGE}
 MEMORY_MODE=${MEMORY_MODE}
 RESOURCE_GROUP_NAME=${RESOURCE_GROUP_NAME}
