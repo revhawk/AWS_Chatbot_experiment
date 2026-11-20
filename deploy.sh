@@ -124,7 +124,10 @@ GUARDRAIL_ID=$(aws bedrock create-guardrail \
   --content-policy-config file:///tmp/guardrail-content.json \
   --word-policy-config file:///tmp/guardrail-words.json \
   --sensitive-information-policy-config file:///tmp/guardrail-pii.json \
+  --tags key=Project,value=AWSBedrockRAGLab key=Stage,value="${STAGE}" key=Stack,value="${SUFFIX}" \
   --query 'guardrailId' --output text --region "${AWS_REGION}")
+
+RESOURCE_GROUP_NAME="bedrock-rag-lab-${STAGE}-${SUFFIX}"
 
 SOURCE_BUCKET="bedrock-rag-docs-${ACCOUNT_ID}-${SUFFIX}"
 SUPP_BUCKET="bedrock-rag-bda-supp-${ACCOUNT_ID}-${SUFFIX}"
@@ -140,6 +143,8 @@ API_NAME="bedrock-rag-api-${SUFFIX}"
 echo "=== 1. Creating S3 Source & Supplemental Buckets (SSE-S3 Managed Encryption) ==="
 aws s3 mb "s3://${SOURCE_BUCKET}" --region "${AWS_REGION}"
 aws s3 mb "s3://${SUPP_BUCKET}" --region "${AWS_REGION}"
+aws s3api put-bucket-tagging --bucket "${SOURCE_BUCKET}" --tagging "TagSet=[{Key=Project,Value=AWSBedrockRAGLab},{Key=Stage,Value=${STAGE}},{Key=Stack,Value=${SUFFIX}}]" --region "${AWS_REGION}"
+aws s3api put-bucket-tagging --bucket "${SUPP_BUCKET}" --tagging "TagSet=[{Key=Project,Value=AWSBedrockRAGLab},{Key=Stage,Value=${STAGE}},{Key=Stack,Value=${SUFFIX}}]" --region "${AWS_REGION}"
 
 if [ -d "./app_docs" ] && [ -n "$(find ./app_docs -maxdepth 1 -type f ! -name '.gitkeep')" ]; then
   aws s3 cp ./app_docs/ "s3://${SOURCE_BUCKET}/" --recursive --exclude ".gitkeep"
@@ -180,7 +185,7 @@ cat > /tmp/kb-trust.json <<EOT
 }
 EOT
 
-KB_ROLE_ARN=$(aws iam create-role --role-name "${KB_ROLE_NAME}" --assume-role-policy-document file:///tmp/kb-trust.json --query 'Role.Arn' --output text)
+KB_ROLE_ARN=$(aws iam create-role --role-name "${KB_ROLE_NAME}" --assume-role-policy-document file:///tmp/kb-trust.json --tags Key=Project,Value=AWSBedrockRAGLab Key=Stage,Value="${STAGE}" Key=Stack,Value="${SUFFIX}" --query 'Role.Arn' --output text)
 
 cat > /tmp/kb-policy.json <<EOT
 {
@@ -237,6 +242,7 @@ KB_ID=$(aws bedrock-agent create-knowledge-base \
       \"indexArn\": \"${VECTOR_INDEX_ARN}\"
     }
   }" \
+  --tags Project=AWSBedrockRAGLab,Stage="${STAGE}",Stack="${SUFFIX}" \
   --query 'knowledgeBase.knowledgeBaseId' --output text --region "${AWS_REGION}")
 
 DS_ID=$(aws bedrock-agent create-data-source \
@@ -264,6 +270,7 @@ aws dynamodb create-table \
   --attribute-definitions AttributeName=session_id,AttributeType=S AttributeName=timestamp,AttributeType=S \
   --key-schema AttributeName=session_id,KeyType=HASH AttributeName=timestamp,KeyType=RANGE \
   --billing-mode PAY_PER_REQUEST \
+  --tags Key=Project,Value=AWSBedrockRAGLab Key=Stage,Value="${STAGE}" Key=Stack,Value="${SUFFIX}" \
   --region "${AWS_REGION}" >/dev/null
 
 echo "=== 6. Creating Lambda Execution Role & Function ==="
@@ -278,7 +285,7 @@ cat > /tmp/lambda-trust.json <<EOT
 }
 EOT
 
-LAMBDA_ROLE_ARN=$(aws iam create-role --role-name "${LAMBDA_ROLE_NAME}" --assume-role-policy-document file:///tmp/lambda-trust.json --query 'Role.Arn' --output text)
+LAMBDA_ROLE_ARN=$(aws iam create-role --role-name "${LAMBDA_ROLE_NAME}" --assume-role-policy-document file:///tmp/lambda-trust.json --tags Key=Project,Value=AWSBedrockRAGLab Key=Stage,Value="${STAGE}" Key=Stack,Value="${SUFFIX}" --query 'Role.Arn' --output text)
 aws iam attach-role-policy --role-name "${LAMBDA_ROLE_NAME}" --policy-arn "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 
 cat > /tmp/lambda-policy.json <<EOT
@@ -313,10 +320,11 @@ LAMBDA_ARN=$(aws lambda create-function \
   --timeout 30 \
   --memory-size 256 \
   --environment "Variables={KB_ID=${KB_ID},MODEL_ARN=arn:aws:bedrock:${AWS_REGION}:${ACCOUNT_ID}:inference-profile/eu.amazon.nova-micro-v1:0,GUARDRAIL_ID=${GUARDRAIL_ID},GUARDRAIL_VERSION=${GUARDRAIL_VERSION},TABLE_NAME=${DDB_TABLE},MEMORY_MODE=${MEMORY_MODE}}" \
+  --tags Project=AWSBedrockRAGLab,Stage="${STAGE}",Stack="${SUFFIX}" \
   --query 'FunctionArn' --output text --region "${AWS_REGION}")
 
 echo "=== 7. Creating API Gateway REST API + API Key ==="
-API_ID=$(aws apigateway create-rest-api --name "${API_NAME}" --endpoint-configuration types=REGIONAL --query 'id' --output text --region "${AWS_REGION}")
+API_ID=$(aws apigateway create-rest-api --name "${API_NAME}" --endpoint-configuration types=REGIONAL --tags Project=AWSBedrockRAGLab,Stage="${STAGE}",Stack="${SUFFIX}" --query 'id' --output text --region "${AWS_REGION}")
 ROOT_ID=$(aws apigateway get-resources --rest-api-id "${API_ID}" --query 'items[0].id' --output text --region "${AWS_REGION}")
 RESOURCE_ID=$(aws apigateway create-resource --rest-api-id "${API_ID}" --parent-id "${ROOT_ID}" --path-part "chat" --query 'id' --output text --region "${AWS_REGION}")
 
@@ -334,10 +342,25 @@ aws apigateway create-usage-plan-key --usage-plan-id "${PLAN_ID}" --key-id "${AP
 
 API_URL="https://${API_ID}.execute-api.${AWS_REGION}.amazonaws.com/${STAGE}/chat"
 
+echo "=== 8. Creating AWS Resource Group (${RESOURCE_GROUP_NAME}) ==="
+cat > /tmp/resource-group-query.json <<EOT
+{
+  "Type": "TAG_FILTERS_1_0",
+  "Query": "{\"ResourceTypeFilters\":[\"AWS::AllSupported\"],\"TagFilters\":[{\"Key\":\"Project\",\"Values\":[\"AWSBedrockRAGLab\"]},{\"Key\":\"Stack\",\"Values\":[\"${SUFFIX}\"]}]}"
+}
+EOT
+aws resource-groups create-group \
+  --name "${RESOURCE_GROUP_NAME}" \
+  --description "AWS Bedrock RAG Chatbot Lab (${STAGE}, ${SUFFIX})" \
+  --resource-query file:///tmp/resource-group-query.json \
+  --tags Project=AWSBedrockRAGLab,Stage="${STAGE}",Stack="${SUFFIX}" \
+  --region "${AWS_REGION}" >/dev/null
+
 cat > .env.lab <<EOT
 AWS_REGION=${AWS_REGION}
 STAGE=${STAGE}
 MEMORY_MODE=${MEMORY_MODE}
+RESOURCE_GROUP_NAME=${RESOURCE_GROUP_NAME}
 SOURCE_BUCKET=${SOURCE_BUCKET}
 SUPP_BUCKET=${SUPP_BUCKET}
 VECTOR_BUCKET=${VECTOR_BUCKET}

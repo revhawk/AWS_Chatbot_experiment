@@ -39,9 +39,12 @@ echo "6. Emptying & Deleting S3 Buckets..."
 aws s3 rb "s3://${SOURCE_BUCKET}" --force --region "${AWS_REGION}" || true
 aws s3 rb "s3://${SUPP_BUCKET}" --force --region "${AWS_REGION}" || true
 
-echo "7. Deleting Lab Guardrail (preserving shared xojv3g7paumh if referenced)..."
-if [ -n "${GUARDRAIL_ID:-}" ] && [ "${GUARDRAIL_ID}" != "xojv3g7paumh" ]; then
+echo "7. Deleting Lab Guardrail & Resource Group..."
+if [ -n "${GUARDRAIL_ID:-}" ]; then
   aws bedrock delete-guardrail --guardrail-identifier "${GUARDRAIL_ID}" --region "${AWS_REGION}" || true
+fi
+if [ -n "${RESOURCE_GROUP_NAME:-}" ]; then
+  aws resource-groups delete-group --group-name "${RESOURCE_GROUP_NAME}" --region "${AWS_REGION}" >/dev/null || true
 fi
 
 rm -f .env.lab

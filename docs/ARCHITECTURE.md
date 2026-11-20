@@ -11,6 +11,7 @@ Serverless RAG chatbot over AI white paper PDFs in AWS `eu-west-1` with $0 idle 
 - **Guardrail:** `deploy.sh` creates a Bedrock Guardrail (`Foul_Language_Blocker-*`, version `DRAFT`) with `HIGH` content filters, `PROFANITY` + custom word blocking, and 31 PII anonymizers, enforced via `retrieve_and_generate` / `converse`.
 - **Orchestration & State:** Direct `bedrock-agent-runtime.retrieve_and_generate` (for `KB_MODE=vector`) or `retrieve` + `converse` (for `KB_MODE=managed`) inside Python 3.12 AWS Lambda (`bedrock-rag-chat-*`), logging session turns and source URIs to an On-Demand DynamoDB table (`BedrockChatHistory-*`). Supports `MEMORY_MODE=single` (default, stateless) or `MEMORY_MODE=multi` (loads recent session turns from DynamoDB for follow-up questions).
 - **API & Auth:** Public regional API Gateway REST API (`POST /chat`) secured with an API key (`x-api-key`) and usage plan throttling (no VPC, ALB, or WAF).
+- **Resource Grouping:** All deployed resources are tagged (`Project=AWSBedrockRAGLab`, `Stage`, `Stack`) and grouped under an AWS Resource Group (`bedrock-rag-lab-<stage>-<suffix>`) for single-pane inspection and cleanup verification.
 - **Client:** Local CLI script (`chat_cli.py`) using Python stdlib (`urllib.request`).
 
 ## Architecture Diagram
