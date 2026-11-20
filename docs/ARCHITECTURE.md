@@ -38,3 +38,26 @@ flowchart LR
 - `scripts/` — Composable infrastructure modules (`lib/common.sh`, `guardrail.sh`, `storage.sh`, `knowledge_base.sh`, `compute_api.sh`, `resource_group.sh`).
 - `lambda/handler.py` — Lambda handler calling `retrieve_and_generate` and writing audit logs to DynamoDB.
 - `chat_cli.py` — Interactive CLI chat client.
+
+## Resource Naming & Tagging
+
+With `FULL_PREFIX="${PREFIX}-${APP_NAME}"` (e.g. `lab-bedrock-rag`) and a Unix timestamp `SUFFIX`, `deploy.sh` names every resource consistently:
+
+| Service / Resource | Naming Pattern |
+| :--- | :--- |
+| **AWS Resource Group** | `${FULL_PREFIX}-${STAGE}-${SUFFIX}` |
+| **Bedrock Guardrail** | `${FULL_PREFIX}-guardrail-${SUFFIX}` |
+| **S3 Source Bucket** | `${FULL_PREFIX}-docs-${ACCOUNT_ID}-${SUFFIX}` |
+| **S3 Supplemental Bucket** | `${FULL_PREFIX}-bda-supp-${ACCOUNT_ID}-${SUFFIX}` |
+| **S3 Vectors Bucket** | `${FULL_PREFIX}-vec-${SUFFIX}` |
+| **S3 Vectors Index** | `whitepapers-index` |
+| **Bedrock Knowledge Base** | `${FULL_PREFIX}-kb-${SUFFIX}` |
+| **KB IAM Role** | `${FULL_PREFIX}-kb-role-${SUFFIX}` |
+| **DynamoDB Table** | `${FULL_PREFIX}-history-${SUFFIX}` |
+| **Lambda Function** | `${FULL_PREFIX}-chat-${SUFFIX}` |
+| **Lambda IAM Role** | `${FULL_PREFIX}-lambda-role-${SUFFIX}` |
+| **API Gateway REST API** | `${FULL_PREFIX}-api-${SUFFIX}` |
+| **API Gateway Key** | `${FULL_PREFIX}-api-${SUFFIX}-key` |
+| **API Gateway Usage Plan** | `${FULL_PREFIX}-api-${SUFFIX}-plan` |
+
+All tagged resources receive: `Project=${APP_NAME}`, `Stage=${STAGE}`, `Stack=${SUFFIX}`, `CostCentre=${TAG_COST_CENTRE}`, and `ResourceID=${TAG_RESOURCE_ID}`.
