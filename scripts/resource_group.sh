@@ -12,7 +12,7 @@ EOT
 
   aws resource-groups create-group \
     --name "${RESOURCE_GROUP_NAME}" \
-    --description "AWS Bedrock RAG Chatbot (${FULL_PREFIX}, ${STAGE}, ${SUFFIX})" \
+    --description "AWS Bedrock RAG Chatbot ${FULL_PREFIX} ${STAGE} ${SUFFIX}" \
     --resource-query file:///tmp/resource-group-query.json \
     --tags "$(tags_kv)" \
     --region "${AWS_REGION}" >/dev/null
