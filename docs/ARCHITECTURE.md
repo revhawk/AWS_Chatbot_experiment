@@ -32,7 +32,9 @@ flowchart LR
 ```
 
 ## Repo Files
-- `deploy.sh` — Imperative AWS CLI deployment script (writes state to gitignored `.env.lab`).
-- `teardown.sh` — Deletes all deployed resources (including the lab-created Guardrail, while preserving `xojv3g7paumh` if ever referenced) in reverse dependency order.
+- `config.env.example` — Template for non-interactive `config.env` deployments (copy to `config.env`, gitignored).
+- `deploy.sh` — Modular deployment entrypoint (writes state to gitignored `.env.lab`).
+- `teardown.sh` — Modular teardown entrypoint deleting all deployed resources in reverse dependency order.
+- `scripts/` — Composable infrastructure modules (`lib/common.sh`, `guardrail.sh`, `storage.sh`, `knowledge_base.sh`, `compute_api.sh`, `resource_group.sh`).
 - `lambda/handler.py` — Lambda handler calling `retrieve_and_generate` and writing audit logs to DynamoDB.
 - `chat_cli.py` — Interactive CLI chat client.
