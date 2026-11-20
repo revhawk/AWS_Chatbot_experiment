@@ -39,3 +39,12 @@ Serverless Retrieval-Augmented Generation (RAG) chatbot built on Amazon Bedrock 
     ```bash
     grep STAGE .env.lab
     ```
+
+## Documentation
+
+- [ARCHITECTURE.md](ARCHITECTURE.md) — Architectural decisions and system diagram
+- [RUNNING_SCRIPTS.md](RUNNING_SCRIPTS.md) — Podman, CloudShell, and local deployment instructions
+
+## License
+
+Licensed under the [MIT License](LICENSE).
