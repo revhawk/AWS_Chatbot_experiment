@@ -45,19 +45,19 @@ prompt_var() {
 
 # --- Tag Formatters (single source of truth) ---
 tags_kv() {
-  echo "Project=${APP_NAME},Stage=${STAGE},Stack=${SUFFIX},CostCentre=${TAG_COST_CENTRE},ResourceID=${TAG_RESOURCE_ID}"
+  echo "Name=${FULL_PREFIX},Project=${APP_NAME},Stage=${STAGE},Stack=${SUFFIX},CostCentre=${TAG_COST_CENTRE},ResourceID=${TAG_RESOURCE_ID}"
 }
 
 tags_bedrock_kv() {
-  echo "key=Project,value=${APP_NAME} key=Stage,value=${STAGE} key=Stack,value=${SUFFIX} key=CostCentre,value=${TAG_COST_CENTRE} key=ResourceID,value=${TAG_RESOURCE_ID}"
+  echo "key=Name,value=${FULL_PREFIX} key=Project,value=${APP_NAME} key=Stage,value=${STAGE} key=Stack,value=${SUFFIX} key=CostCentre,value=${TAG_COST_CENTRE} key=ResourceID,value=${TAG_RESOURCE_ID}"
 }
 
 tags_iam() {
-  echo "Key=Project,Value=${APP_NAME} Key=Stage,Value=${STAGE} Key=Stack,Value=${SUFFIX} Key=CostCentre,Value=${TAG_COST_CENTRE} Key=ResourceID,Value=${TAG_RESOURCE_ID}"
+  echo "Key=Name,Value=${FULL_PREFIX} Key=Project,Value=${APP_NAME} Key=Stage,Value=${STAGE} Key=Stack,Value=${SUFFIX} Key=CostCentre,Value=${TAG_COST_CENTRE} Key=ResourceID,Value=${TAG_RESOURCE_ID}"
 }
 
 tags_s3() {
-  echo "TagSet=[{Key=Project,Value=${APP_NAME}},{Key=Stage,Value=${STAGE}},{Key=Stack,Value=${SUFFIX}},{Key=CostCentre,Value=${TAG_COST_CENTRE}},{Key=ResourceID,Value=${TAG_RESOURCE_ID}}]"
+  echo "TagSet=[{Key=Name,Value=${FULL_PREFIX}},{Key=Project,Value=${APP_NAME}},{Key=Stage,Value=${STAGE}},{Key=Stack,Value=${SUFFIX}},{Key=CostCentre,Value=${TAG_COST_CENTRE}},{Key=ResourceID,Value=${TAG_RESOURCE_ID}}]"
 }
 
 # --- IAM Helpers ---
