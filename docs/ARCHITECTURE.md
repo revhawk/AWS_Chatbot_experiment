@@ -72,7 +72,7 @@ Re-ingesting and vectorising documents via Bedrock Data Automation (BDA) and Tit
 - **On `./deploy.sh`:**
   - **Pre-deploy discovery & confirmation (`scripts/checks.sh`):** Checks `config.env` (`KB_ID` / `KB_NAME` / `GUARDRAIL_ID`) and scans AWS for reusable resources from previous runs (`${FULL_PREFIX}-kb-*`, `${FULL_PREFIX}-guardrail-*`, `${FULL_PREFIX}-history-*`) plus any leftover Lambdas, API Gateways, or Resource Groups. Displays a `[CREATE]` / `[REUSE]` / `[SKIP]` build plan and asks for confirmation (`--yes` to auto-approve).
   - **Resource Group re-tagging (`scripts/resource_group.sh`):** Re-tags any reused Knowledge Base, S3 buckets, IAM role, Guardrail, or DynamoDB table with the new `Stack=${SUFFIX}` so they appear inside the new AWS Resource Group.
-  - **Post-deploy smoke test (`scripts/checks.sh`):** Sends a live sample `POST /chat` request after deployment and prints the HTTP status, `guardrail_action`, sample answer, and citation sources (`--skip-smoke-test` or `RUN_SMOKE_TEST="false"` to disable).
+  - **Post-deploy smoke test (`scripts/checks.sh`):** Runs 4 live `POST /chat` checks after deployment (RAG sample query + custom word block, prompt attack block, and PII anonymization) and prints HTTP status, `guardrail_action`, answers, and citation sources (`--skip-smoke-test` or `RUN_SMOKE_TEST="false"` to disable).
 
 ## Future Optimisations & Deferred Decisions
 

@@ -30,18 +30,23 @@ class _FakeKey:
 
 def _load_handler(kb_mode="vector", memory_mode="single"):
     """Load lambda/handler.py with mocked boto3/botocore clients."""
-    os.environ.update(
-        {
-            "AWS_REGION": "eu-west-1",
-            "TABLE_NAME": "test-history-table",
-            "KB_ID": "KB12345678",
-            "MODEL_ARN": "arn:aws:bedrock:eu-west-1:123456789012:inference-profile/eu.amazon.nova-micro-v1:0",
-            "GUARDRAIL_ID": "gr-test-123",
-            "GUARDRAIL_VERSION": "DRAFT",
-            "KB_MODE": kb_mode,
-            "MEMORY_MODE": memory_mode,
-        }
-    )
+    env = {
+        "AWS_REGION": "eu-west-1",
+        "TABLE_NAME": "test-history-table",
+        "KB_ID": "KB12345678",
+        "MODEL_ARN": "arn:aws:bedrock:eu-west-1:123456789012:inference-profile/eu.amazon.nova-micro-v1:0",
+        "GUARDRAIL_ID": "gr-test-123",
+        "GUARDRAIL_VERSION": "DRAFT",
+    }
+    os.environ.update(env)
+    if kb_mode is None:
+        os.environ.pop("KB_MODE", None)
+    else:
+        os.environ["KB_MODE"] = kb_mode
+    if memory_mode is None:
+        os.environ.pop("MEMORY_MODE", None)
+    else:
+        os.environ["MEMORY_MODE"] = memory_mode
 
     mock_bedrock_agent = MagicMock()
     mock_bedrock_runtime = MagicMock()
@@ -119,8 +124,23 @@ class TestLambdaHandlerContract(unittest.TestCase):
                     },
                 },
                 {
+                    "content": {"text": "Duplicate SharePoint citation."},
+                    "location": {
+                        "sharePointLocation": {
+                            "url": "https://contoso.sharepoint.com/sites/eng/Shared%20Documents/policy.pdf"
+                        }
+                    },
+                },
+                {
+                    "content": {"text": "Chunk without location."},
+                },
+                {
                     "content": {"text": "Supplemental S3 doc."},
                     "location": {"s3Location": {"uri": "s3://docs/extra.pdf"}},
+                },
+                {
+                    "content": {"text": "Web doc."},
+                    "location": {"webLocation": {"url": "https://example.com/guide"}},
                 },
             ]
         }
@@ -141,8 +161,12 @@ class TestLambdaHandlerContract(unittest.TestCase):
             [
                 "https://contoso.sharepoint.com/sites/eng/Shared%20Documents/policy.pdf",
                 "s3://docs/extra.pdf",
+                "https://example.com/guide",
             ],
         )
+        # Verify managedSearchConfiguration requests exactly 5 results
+        retrieve_cfg = bedrock_agent.retrieve.call_args.kwargs["retrievalConfiguration"]
+        self.assertEqual(retrieve_cfg["managedSearchConfiguration"]["numberOfResults"], 5)
 
     def test_managed_mode_guardrail_intervention(self):
         handler, bedrock_agent, bedrock_runtime, _ = _load_handler(kb_mode="managed")
@@ -273,9 +297,30 @@ class TestLambdaHandlerContract(unittest.TestCase):
             {"body": json.dumps({"prompt": "Third Q", "session_id": "sess-multi"})}, None
         )
         self.assertEqual(resp["statusCode"], 200)
+        query_kwargs = table.query.call_args.kwargs
+        self.assertIs(query_kwargs["ScanIndexForward"], False)
         sent_text = bedrock_agent.retrieve_and_generate.call_args.kwargs["input"]["text"]
         self.assertLess(sent_text.index("First Q"), sent_text.index("Second Q"))
         self.assertIn("Current question: Third Q", sent_text)
+
+    def test_defaults_when_kb_mode_and_memory_mode_env_vars_omitted(self):
+        handler, bedrock_agent, _, table = _load_handler(kb_mode=None, memory_mode=None)
+        self.assertEqual(handler.KB_MODE, "vector")
+        self.assertEqual(handler.MEMORY_MODE, "single")
+        bedrock_agent.retrieve_and_generate.return_value = {
+            "output": {"text": "Default mode works"},
+            "guardrailAction": "NONE",
+            "citations": [],
+        }
+        resp = handler.lambda_handler({"body": json.dumps({"prompt": "hello"})}, None)
+        self.assertEqual(resp["statusCode"], 200)
+        table.query.assert_not_called()
+
+    def test_unsupported_kb_mode_returns_500(self):
+        handler, _, _, _ = _load_handler(kb_mode="unsupported")
+        resp = handler.lambda_handler({"body": json.dumps({"prompt": "hello"})}, None)
+        self.assertEqual(resp["statusCode"], 500)
+        self.assertIn("Unsupported KB_MODE", json.loads(resp["body"])["error"])
 
     def test_validation_errors_return_400(self):
         handler, _, _, _ = _load_handler()

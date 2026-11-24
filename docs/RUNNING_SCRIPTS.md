@@ -37,7 +37,7 @@ This guide covers how to run the deployment and teardown scripts using **Podman*
    aws login --remote
    ```
    *(Or use `aws sso login` / `aws configure` if you use IAM Identity Center or IAM keys. Credentials are saved to `~/.aws` on your host.)*
-5. Deploy (shows a **Pre-Deploy Check & Build Plan** for confirmation, deploys the stack, and runs a **Post-Deploy Smoke Test** with a sample question/response):
+5. Deploy (shows a **Pre-Deploy Check & Build Plan** for confirmation, deploys the stack, and runs a **Post-Deploy Smoke Test** covering a RAG sample query plus guardrail checks for custom word blocking, prompt attacks, and PII anonymization):
    ```bash
    ./deploy.sh
    # or skip prompts / auto-approve:
