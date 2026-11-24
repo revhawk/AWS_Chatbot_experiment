@@ -66,6 +66,7 @@ flowchart LR
 
 ## Documentation
 
+- [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) — 5-minute quickstart guide (Podman, Bash, and Terraform)
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — Architectural decisions and system diagram
 - [docs/RUNNING_SCRIPTS.md](docs/RUNNING_SCRIPTS.md) — Podman, CloudShell, and local deployment instructions
 - [docs/TESTING.md](docs/TESTING.md) — Unit, contract, mutation, and post-deploy smoke testing guide
