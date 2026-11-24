@@ -124,6 +124,59 @@ class TestChatCli(unittest.TestCase):
             runpy.run_path(CLI_PATH, run_name="__main__")
         self.assertIn("Exiting.", buf.getvalue())
 
+    def test_contract_cli_directly_to_lambda_handler(self):
+        """In-process contract test wiring chat_cli.py directly into lambda/handler.py."""
+        from test_handler import _load_handler
+
+        handler, bedrock_agent, bedrock_runtime, table = _load_handler(kb_mode="managed", memory_mode="single")
+        bedrock_agent.retrieve.return_value = {
+            "retrievalResults": [
+                {
+                    "content": {"text": "Architecture doc excerpt."},
+                    "location": {"sharePointLocation": {"url": "https://contoso.sharepoint.com/doc.pdf"}},
+                }
+            ]
+        }
+        bedrock_runtime.converse.return_value = {
+            "output": {"message": {"content": [{"text": "Contract verified."}]}},
+            "stopReason": "end_turn",
+        }
+
+        seen_sessions = []
+
+        def in_process_transport(req, timeout=None):
+            raw_body = req.data.decode("utf-8")
+            lambda_resp = handler.lambda_handler({"body": raw_body}, None)
+            if lambda_resp["statusCode"] >= 400:
+                raise urllib.error.HTTPError(
+                    req.full_url,
+                    lambda_resp["statusCode"],
+                    "Error",
+                    {},
+                    io.BytesIO(lambda_resp["body"].encode("utf-8")),
+                )
+            parsed = json.loads(lambda_resp["body"])
+            seen_sessions.append(parsed["session_id"])
+            return _fake_http_response(parsed)
+
+        inputs = iter(["First question", "Second question", "exit"])
+        buf = io.StringIO()
+        with (
+            patch.dict(os.environ, {"RAG_API_URL": "https://api.example/chat", "RAG_API_KEY": "secret"}),
+            patch("builtins.input", side_effect=inputs),
+            patch("urllib.request.urlopen", side_effect=in_process_transport),
+            redirect_stdout(buf),
+        ):
+            runpy.run_path(CLI_PATH, run_name="__main__")
+
+        out = buf.getvalue()
+        self.assertIn("Assistant [NONE]: Contract verified.", out)
+        self.assertIn("Sources: https://contoso.sharepoint.com/doc.pdf", out)
+        # Turn 2 must reuse the exact session_id returned by Lambda on Turn 1
+        self.assertEqual(len(seen_sessions), 2)
+        self.assertEqual(seen_sessions[0], seen_sessions[1])
+        self.assertEqual(table.put_item.call_count, 2)
+
 
 if __name__ == "__main__":
     unittest.main()
