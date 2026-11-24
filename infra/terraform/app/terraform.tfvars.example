@@ -1,0 +1,19 @@
+aws_region  = "eu-west-1"
+prefix      = "lab"
+app_name    = "bedrock-rag"
+stage       = "prod"
+cost_centre = "IT"
+resource_id = "001"
+
+kb_mode     = "vector" # "vector" | "managed"
+memory_mode = "single" # "single" | "multi"
+model_id    = "eu.amazon.nova-micro-v1:0"
+
+# By default, reads kb_id & guardrail_id from ../knowledge/terraform.tfstate.
+# To link an existing pre-built Knowledge Base (e.g. a Managed/SharePoint KB) instead,
+# set use_knowledge_remote_state = false and provide kb_id + guardrail_id explicitly:
+use_knowledge_remote_state  = true
+kb_id                       = ""
+guardrail_id                = ""
+guardrail_version           = ""
+sharepoint_permission_scope = "Sites.Selected" # "Sites.Selected" | "Sites.Read.All"

@@ -8,3 +8,8 @@ __pycache__/
 *.pyc
 *.zip
 .DS_Store
+.terraform/
+.build/
+*.tfstate
+*.tfstate.*
+terraform.tfvars

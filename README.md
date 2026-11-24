@@ -68,6 +68,8 @@ flowchart LR
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — Architectural decisions and system diagram
 - [docs/RUNNING_SCRIPTS.md](docs/RUNNING_SCRIPTS.md) — Podman, CloudShell, and local deployment instructions
+- [docs/TESTING.md](docs/TESTING.md) — Unit, contract, mutation, and post-deploy smoke testing guide
+- [infra/terraform/README.md](infra/terraform/README.md) — 2-stack Terraform IaC deployment (persistent `knowledge/` + ephemeral `app/`, run via Podman)
 
 ## License
 

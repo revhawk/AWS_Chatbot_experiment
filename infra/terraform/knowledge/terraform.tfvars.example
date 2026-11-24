@@ -1,0 +1,11 @@
+aws_region  = "eu-west-1"
+prefix      = "lab"
+app_name    = "bedrock-rag"
+stage       = "prod"
+cost_centre = "IT"
+resource_id = "001"
+
+# Set create_guardrail = false and provide existing_guardrail_id to reuse an existing guardrail
+create_guardrail      = true
+existing_guardrail_id = ""
+guardrail_version     = "DRAFT"

@@ -67,7 +67,7 @@ This guide covers how to run the deployment and teardown scripts using **Podman*
 
 ## 3. Running Local Unit, Contract & Mutation Tests
 
-Run the offline test suites anytime (no AWS credentials or extra pip packages required):
+Run the offline test suites anytime (no AWS credentials or extra pip packages required — see [TESTING.md](TESTING.md) for full details):
 ```bash
 # Unit & API contract tests (Lambda, CLI, and mocked-AWS Bash scripts)
 python3 -m unittest discover -s tests -v
