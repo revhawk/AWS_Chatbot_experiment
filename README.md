@@ -27,9 +27,10 @@ flowchart LR
    ```bash
    cp config.env.example config.env
    ```
-3. *(Optional)* Run the local unit & contract test suite (no AWS credentials required):
+3. *(Optional)* Run the local unit, contract, and mutation test suites (no AWS credentials required):
    ```bash
    python3 -m unittest discover -s tests -v
+   python3 tests/mutation_test.py
    ```
 4. Deploy the stack (discovers reusable resources from prior runs, displays a pre-deploy build plan for confirmation, deploys, and runs a post-deploy smoke test):
    ```bash

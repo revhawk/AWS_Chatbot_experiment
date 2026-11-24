@@ -39,7 +39,7 @@ flowchart LR
 - `teardown.sh` — Modular teardown entrypoint deleting all deployed resources in reverse dependency order.
 - `scripts/` — Composable infrastructure modules (`lib/common.sh`, `guardrail.sh`, `storage.sh`, `knowledge_base.sh`, `compute_api.sh`, `resource_group.sh`, `checks.sh`).
 - `lambda/handler.py` — Lambda handler calling `retrieve_and_generate` (`KB_MODE=vector`) or `retrieve` + `converse` (`KB_MODE=managed`), extracting S3/SharePoint/Web citation URLs, and writing audit logs to DynamoDB.
-- `tests/` — Local unit & API contract tests (`python3 -m unittest discover -s tests -v`).
+- `tests/` — Offline unit, API contract, and mutation tests covering Lambda, CLI, and Bash modules (`test_handler.py`, `test_cli.py`, `test_scripts.py`, `mutation_test.py`; run with `python3 -m unittest discover -s tests -v` and `python3 tests/mutation_test.py`).
 - `chat_cli.py` — Interactive CLI chat client.
 
 ## Resource Naming & Tagging
