@@ -1,5 +1,35 @@
 #!/usr/bin/env bash
-# Bedrock Guardrail module (creates a copy of Foul_Language_Blocker unless GUARDRAIL_ID is pre-set)
+# Bedrock Guardrail module (creates a copy of Foul_Language_Blocker unless GUARDRAIL_ID is pre-set or reused)
+
+resolve_existing_guardrail() {
+  GUARDRAIL_VERSION="${GUARDRAIL_VERSION:-DRAFT}"
+
+  if [ -n "${GUARDRAIL_ID:-}" ]; then
+    GUARDRAIL_MANAGED="false"
+    return 0
+  fi
+
+  local existing_line existing_id existing_name reuse_reply
+  existing_line=$(aws bedrock list-guardrails --region "${AWS_REGION}" \
+    --query "guardrails[?starts_with(name, '${FULL_PREFIX}-guardrail-')].[id,name]" \
+    --output text 2>/dev/null | head -n 1 || true)
+
+  if [ -n "${existing_line}" ] && [ "${existing_line}" != "None" ] && [ -t 0 ]; then
+    read -r existing_id existing_name <<< "${existing_line}"
+    if [ -n "${existing_id}" ] && [ -n "${existing_name}" ]; then
+      echo ""
+      echo "Found existing Guardrail from a previous run: ${existing_name} (${existing_id})"
+      read -r -p "Reuse this Guardrail instead of creating a new one? [Y/n]: " reuse_reply
+      reuse_reply=$(echo "${reuse_reply:-y}" | tr '[:upper:]' '[:lower:]')
+      if [[ "${reuse_reply}" == "y" || "${reuse_reply}" == "yes" ]]; then
+        GUARDRAIL_ID="${existing_id}"
+        GUARDRAIL_MANAGED="false"
+        echo "Reusing existing Bedrock Guardrail: ${existing_name} (${GUARDRAIL_ID})"
+        return 0
+      fi
+    fi
+  fi
+}
 
 deploy_guardrail() {
   GUARDRAIL_VERSION="${GUARDRAIL_VERSION:-DRAFT}"

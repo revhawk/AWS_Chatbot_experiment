@@ -43,6 +43,46 @@ prompt_var() {
   fi
 }
 
+# Persist KEY="VALUE" into config.env (creating from config.env.example if missing).
+save_config_var() {
+  local file="$1"
+  local key="$2"
+  local value="$3"
+
+  if [ ! -f "${file}" ]; then
+    if [ -f "${SCRIPT_DIR}/config.env.example" ]; then
+      cp "${SCRIPT_DIR}/config.env.example" "${file}"
+    else
+      touch "${file}"
+    fi
+  fi
+
+  local tmp_file="${file}.tmp.$$"
+  if grep -qE "^(#[[:space:]]*)?${key}=" "${file}"; then
+    awk -v k="${key}" -v v="${value}" '
+      !done && $0 ~ "^(#[[:space:]]*)?" k "=" { print k "=\"" v "\""; done=1; next }
+      { print }
+    ' "${file}" > "${tmp_file}" && mv "${tmp_file}" "${file}"
+  else
+    printf '%s="%s"\n' "${key}" "${value}" >> "${file}"
+  fi
+}
+
+# Comment out KEY=... in config.env when a previously preserved resource is deleted.
+clear_config_var() {
+  local file="$1"
+  local key="$2"
+  [ ! -f "${file}" ] && return 0
+
+  if grep -qE "^${key}=" "${file}"; then
+    local tmp_file="${file}.tmp.$$"
+    awk -v k="${key}" '
+      $0 ~ "^" k "=" { print "# " k "=\"\""; next }
+      { print }
+    ' "${file}" > "${tmp_file}" && mv "${tmp_file}" "${file}"
+  fi
+}
+
 # --- Tag Formatters (single source of truth) ---
 tags_kv() {
   echo "Name=${FULL_PREFIX},Project=${APP_NAME},Stage=${STAGE},Stack=${SUFFIX},CostCentre=${TAG_COST_CENTRE},ResourceID=${TAG_RESOURCE_ID}"

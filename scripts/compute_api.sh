@@ -1,16 +1,40 @@
 #!/usr/bin/env bash
 # DynamoDB, Lambda + IAM Role, and API Gateway + API Key + Usage Plan module
 
+resolve_existing_ddb_table() {
+  DDB_REUSED="false"
+  local existing_table reuse_reply
+  existing_table=$(aws dynamodb list-tables --region "${AWS_REGION}" \
+    --query "TableNames[?starts_with(@, '${FULL_PREFIX}-history-')]" \
+    --output text 2>/dev/null | awk '{print $1}' || true)
+
+  if [ -n "${existing_table}" ] && [ "${existing_table}" != "None" ] && [ -t 0 ]; then
+    echo ""
+    echo "Found existing DynamoDB history table from a previous run: ${existing_table}"
+    read -r -p "Reuse this DynamoDB table to keep existing chat history? [Y/n]: " reuse_reply
+    reuse_reply=$(echo "${reuse_reply:-y}" | tr '[:upper:]' '[:lower:]')
+    if [[ "${reuse_reply}" == "y" || "${reuse_reply}" == "yes" ]]; then
+      DDB_TABLE="${existing_table}"
+      DDB_REUSED="true"
+      echo "Reusing existing DynamoDB table: ${DDB_TABLE}"
+    fi
+  fi
+}
+
 deploy_compute_api() {
-  echo "=== 5. Creating DynamoDB Table (On-Demand, AWS Owned Key) ==="
-  # shellcheck disable=SC2046
-  aws dynamodb create-table \
-    --table-name "${DDB_TABLE}" \
-    --attribute-definitions AttributeName=session_id,AttributeType=S AttributeName=timestamp,AttributeType=S \
-    --key-schema AttributeName=session_id,KeyType=HASH AttributeName=timestamp,KeyType=RANGE \
-    --billing-mode PAY_PER_REQUEST \
-    --tags $(tags_iam) \
-    --region "${AWS_REGION}" >/dev/null
+  if [ "${DDB_REUSED:-false}" = "true" ]; then
+    echo "=== 5. Reusing existing DynamoDB Table (${DDB_TABLE}) ==="
+  else
+    echo "=== 5. Creating DynamoDB Table (On-Demand, AWS Owned Key) ==="
+    # shellcheck disable=SC2046
+    aws dynamodb create-table \
+      --table-name "${DDB_TABLE}" \
+      --attribute-definitions AttributeName=session_id,AttributeType=S AttributeName=timestamp,AttributeType=S \
+      --key-schema AttributeName=session_id,KeyType=HASH AttributeName=timestamp,KeyType=RANGE \
+      --billing-mode PAY_PER_REQUEST \
+      --tags $(tags_iam) \
+      --region "${AWS_REGION}" >/dev/null
+  fi
 
   echo "=== 6. Creating Lambda Execution Role & Function ==="
   cat > /tmp/lambda-trust.json <<EOT
@@ -55,7 +79,7 @@ EOT
     --zip-file fileb:///tmp/lambda.zip \
     --timeout 30 \
     --memory-size 256 \
-    --environment "Variables={KB_ID=${KB_ID},MODEL_ARN=arn:aws:bedrock:${AWS_REGION}:${ACCOUNT_ID}:inference-profile/eu.amazon.nova-micro-v1:0,GUARDRAIL_ID=${GUARDRAIL_ID},GUARDRAIL_VERSION=${GUARDRAIL_VERSION},TABLE_NAME=${DDB_TABLE},MEMORY_MODE=${MEMORY_MODE}}" \
+    --environment "Variables={KB_ID=${KB_ID},KB_MODE=${KB_MODE},MODEL_ARN=arn:aws:bedrock:${AWS_REGION}:${ACCOUNT_ID}:inference-profile/eu.amazon.nova-micro-v1:0,GUARDRAIL_ID=${GUARDRAIL_ID},GUARDRAIL_VERSION=${GUARDRAIL_VERSION},TABLE_NAME=${DDB_TABLE},MEMORY_MODE=${MEMORY_MODE}}" \
     --tags "$(tags_kv)" \
     --query 'FunctionArn' --output text --region "${AWS_REGION}")
 

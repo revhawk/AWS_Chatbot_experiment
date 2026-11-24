@@ -51,6 +51,17 @@ def _load_history(session_id):
         return []
 
 
+def _extract_source_uri(location):
+    """Extract a citation URI/URL from S3, SharePoint, or Web locations."""
+    if not isinstance(location, dict):
+        return None
+    return (
+        location.get("s3Location", {}).get("uri")
+        or location.get("sharePointLocation", {}).get("url")
+        or location.get("webLocation", {}).get("url")
+    )
+
+
 def _query_vector_kb(prompt, history):
     """Query a vector-store Knowledge Base (e.g. S3 Vectors) via retrieve_and_generate."""
     query_text = prompt
@@ -83,7 +94,7 @@ def _query_vector_kb(prompt, history):
     sources = []
     for citation in response.get("citations", []):
         for ref in citation.get("retrievedReferences", []):
-            uri = ref.get("location", {}).get("s3Location", {}).get("uri")
+            uri = _extract_source_uri(ref.get("location"))
             if uri and uri not in sources:
                 sources.append(uri)
     return answer, guardrail_action, sources
@@ -107,7 +118,7 @@ def _query_managed_kb(prompt, history):
         text = result.get("content", {}).get("text")
         if text:
             chunks.append(text)
-        uri = result.get("location", {}).get("s3Location", {}).get("uri")
+        uri = _extract_source_uri(result.get("location"))
         if uri and uri not in sources:
             sources.append(uri)
 

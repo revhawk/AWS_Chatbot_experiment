@@ -2,6 +2,11 @@
 # S3 source/supplemental buckets and S3 Vectors bucket/index module
 
 deploy_storage() {
+  if [ "${KB_REUSED:-false}" = "true" ]; then
+    echo "=== 1-2. Skipping S3 & S3 Vectors creation (reusing Knowledge Base ${KB_NAME:-$KB_ID}) ==="
+    return 0
+  fi
+
   echo "=== 1. Creating S3 Source & Supplemental Buckets (SSE-S3 Managed Encryption) ==="
   aws s3 mb "s3://${SOURCE_BUCKET}" --region "${AWS_REGION}"
   aws s3 mb "s3://${SUPP_BUCKET}" --region "${AWS_REGION}"
@@ -33,11 +38,20 @@ deploy_storage() {
 }
 
 teardown_storage() {
-  echo "Deleting S3 Vectors Index & Bucket..."
-  aws s3vectors delete-index --vector-bucket-name "${VECTOR_BUCKET}" --index-name "${VECTOR_INDEX}" --region "${AWS_REGION}" || true
-  aws s3vectors delete-vector-bucket --vector-bucket-name "${VECTOR_BUCKET}" --region "${AWS_REGION}" || true
+  if [ "${KEEP_KB:-false}" = "true" ]; then
+    echo "Preserving S3 & S3 Vectors storage for Knowledge Base (${KB_NAME:-$KB_ID})."
+    return 0
+  fi
 
-  echo "Emptying & Deleting S3 Buckets..."
-  aws s3 rb "s3://${SOURCE_BUCKET}" --force --region "${AWS_REGION}" || true
-  aws s3 rb "s3://${SUPP_BUCKET}" --force --region "${AWS_REGION}" || true
+  if [ -n "${VECTOR_BUCKET:-}" ] && [ -n "${VECTOR_INDEX:-}" ]; then
+    echo "Deleting S3 Vectors Index & Bucket..."
+    aws s3vectors delete-index --vector-bucket-name "${VECTOR_BUCKET}" --index-name "${VECTOR_INDEX}" --region "${AWS_REGION}" || true
+    aws s3vectors delete-vector-bucket --vector-bucket-name "${VECTOR_BUCKET}" --region "${AWS_REGION}" || true
+  fi
+
+  if [ -n "${SOURCE_BUCKET:-}" ] || [ -n "${SUPP_BUCKET:-}" ]; then
+    echo "Emptying & Deleting S3 Buckets..."
+    [ -n "${SOURCE_BUCKET:-}" ] && aws s3 rb "s3://${SOURCE_BUCKET}" --force --region "${AWS_REGION}" || true
+    [ -n "${SUPP_BUCKET:-}" ] && aws s3 rb "s3://${SUPP_BUCKET}" --force --region "${AWS_REGION}" || true
+  fi
 }
