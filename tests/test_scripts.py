@@ -360,6 +360,82 @@ if [[ "$*" == *"lambda list-functions"* ]]; then echo "lab-rag-chat-old"; exit 0
             self.assertIn("[REUSE]  DynamoDB Table", res.stdout)
             self.assertIn("lab-rag-chat-old", res.stdout)
 
+    def test_smoke_test_tf_passes_and_catches_unhealthy_or_failed_ingestion(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            log = Path(tmp) / "aws.log"
+            behavior = """
+if [[ "$*" == *"describe-target-groups"* ]]; then echo "arn:aws:elasticloadbalancing:eu-west-1:123:targetgroup/tg/1"; exit 0; fi
+if [[ "$*" == *"describe-target-health"* ]]; then echo "${MOCK_TG_STATE:-healthy healthy}"; exit 0; fi
+if [[ "$*" == *"get-knowledge-base"* ]]; then echo "${MOCK_KB_STATUS:-ACTIVE}"; exit 0; fi
+if [[ "$*" == *"start-ingestion-job"* ]]; then echo "JOB123"; exit 0; fi
+if [[ "$*" == *"get-ingestion-job"* ]]; then echo "${MOCK_JOB_STATUS:-COMPLETE}"; exit 0; fi
+if [[ "$*" == *"bedrock-agent-runtime retrieve"* ]]; then echo "${MOCK_HIT_COUNT:-1}"; exit 0; fi
+if [[ "$*" == *"list-group-resources"* ]]; then echo "42"; exit 0; fi
+"""
+            _create_mock_aws(Path(tmp), log, behavior)
+            sleep_stub = Path(tmp) / "sleep"
+            sleep_stub.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            sleep_stub.chmod(0o755)
+            base_env = {
+                "PATH": f"{tmp}:{os.environ['PATH']}",
+                "SOURCE_BUCKET": "lab-docs",
+                "KB_ID": "KB123",
+                "DATA_SOURCE_ID": "DS123",
+                "RESOURCE_GROUP_NAME": "lab-rg",
+                "MAX_INGESTION_POLLS": "2",
+                "POLL_INTERVAL_SECONDS": "0",
+            }
+
+            # 1. Happy path
+            res = _run_bash("bash scripts/smoke_test_tf.sh", env_extra=base_env)
+            self.assertEqual(res.returncode, 0, res.stderr)
+            self.assertIn("Smoke Test PASSED", res.stdout)
+            calls = log.read_text(encoding="utf-8")
+            self.assertIn("s3 cp", calls)
+            self.assertIn("smoke_test_sample.txt", calls)
+            self.assertIn("bedrock-agent start-ingestion-job", calls)
+            self.assertIn("bedrock-agent-runtime retrieve", calls)
+
+            # 2. Unhealthy target group fails
+            res_tg = _run_bash(
+                "bash scripts/smoke_test_tf.sh",
+                env_extra={**base_env, "MOCK_TG_STATE": "healthy unhealthy"},
+            )
+            self.assertNotEqual(res_tg.returncode, 0)
+            self.assertIn("unhealthy", res_tg.stderr)
+
+            # 3. Inactive KB fails
+            res_kb = _run_bash(
+                "bash scripts/smoke_test_tf.sh",
+                env_extra={**base_env, "MOCK_KB_STATUS": "CREATING"},
+            )
+            self.assertNotEqual(res_kb.returncode, 0)
+            self.assertIn("not ACTIVE", res_kb.stderr)
+
+            # 4. Failed ingestion job fails
+            res_fail = _run_bash(
+                "bash scripts/smoke_test_tf.sh",
+                env_extra={**base_env, "MOCK_JOB_STATUS": "FAILED"},
+            )
+            self.assertNotEqual(res_fail.returncode, 0)
+            self.assertIn("FAILED", res_fail.stderr)
+
+            # 5. Timed-out ingestion job fails
+            res_timeout = _run_bash(
+                "bash scripts/smoke_test_tf.sh",
+                env_extra={**base_env, "MOCK_JOB_STATUS": "IN_PROGRESS"},
+            )
+            self.assertNotEqual(res_timeout.returncode, 0)
+            self.assertIn("did not complete", res_timeout.stderr)
+
+            # 6. Zero retrieval chunks fails
+            res_zero = _run_bash(
+                "bash scripts/smoke_test_tf.sh",
+                env_extra={**base_env, "MOCK_HIT_COUNT": "0"},
+            )
+            self.assertNotEqual(res_zero.returncode, 0)
+            self.assertIn("0 chunks", res_zero.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

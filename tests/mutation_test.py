@@ -32,6 +32,7 @@ BASH_TARGETS = [
     ("scripts/compute_api.sh", ["tests.test_scripts"]),
     ("scripts/resource_group.sh", ["tests.test_scripts"]),
     ("scripts/checks.sh", ["tests.test_scripts"]),
+    ("scripts/smoke_test_tf.sh", ["tests.test_scripts"]),
     ("deploy.sh", ["tests.test_scripts"]),
     ("teardown.sh", ["tests.test_scripts"]),
 ]

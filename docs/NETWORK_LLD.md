@@ -102,7 +102,7 @@ All Security Groups are stateful, drop all unmentioned traffic by default, and p
 - **TLS Policy:** `ELBSecurityPolicy-TLS13-1-2-2021-06` (TLS 1.3 preferred, TLS 1.2 minimum; TLS 1.0/1.1 disabled)
 - **Certificate:** ACM certificate (`var.acm_certificate_arn`) matching the corporate application hostname
 - **Header Hardening:** `drop_invalid_header_fields = true`
-- **Access Logs:** Enabled → KMS-encrypted S3 audit bucket (`prefix = "alb-access-logs"`)
+- **Access Logs:** Enabled → dedicated SSE-S3 (`AES256`) ALB logs bucket (`prefix = "alb-access-logs"`, ELB service account policy)
 
 ### 6.2 Listener Routing & Target Groups
 | Priority | Condition | Target Group | Target Type & Targets | Health Check |

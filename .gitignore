@@ -16,3 +16,4 @@ frontend/dist/
 *.tfstate.*
 .terraform.lock.hcl
 terraform.tfvars
+local_docs/
