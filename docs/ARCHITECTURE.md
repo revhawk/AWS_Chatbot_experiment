@@ -33,12 +33,56 @@ flowchart LR
     DEPLOY["deploy.sh / teardown.sh + config.env"] -.->|"Tags (Name, Project, Stage, CostCentre, ResourceID)"| RG["AWS Resource Group"]
 ```
 
+### TDA Full-Stack Architecture (`backend/` + `frontend/` + `infra/terraform/`)
+
+```mermaid
+flowchart LR
+    USER["User Browser"] -->|"HTTPS"| CF["CloudFront + WAF + S3<br/>(spa_hosting + edge_ingress)"]
+    USER <-->|"OIDC PKCE"| ENTRA["Microsoft Entra ID"]
+    CF -->|"/api/*"| ALB["Internal ALB / API Gateway"]
+    ALB -->|"Proxy"| BE["Clean Architecture Lambda<br/>(backend/entrypoints/lambda_handler.py)"]
+
+    BE -->|"Control C1: Verify JWT"| JWKS["jwks_verifier.py"]
+    BE -->|"Control C6: Redact Logs"| CW["CloudWatch Logs (KMS)"]
+    BE -->|"Invoke"| AC["AgentCore Runtime<br/>(agentcore_runtime/)"]
+    AC -->|"Retrieve + Converse"| KB["Bedrock Knowledge Base + Guardrail"]
+    BE <-->|"History & Feedback"| DDB["DynamoDB (KMS)"]
+    BE -.->|"PrivateLink"| VPCE["VPC Endpoints<br/>(vpc_endpoints)"]
+```
+
+### Auth & RAG Request Flow
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant SPA as React SPA (frontend/)
+    participant Entra as Microsoft Entra ID
+    participant API as Backend Lambda (backend/)
+    participant AC as AgentCore + Bedrock
+    participant DDB as DynamoDB
+
+    User->>SPA: Sign in
+    SPA->>Entra: OIDC PKCE Login
+    Entra-->>SPA: Access JWT (Bearer)
+    User->>SPA: Ask question
+    SPA->>API: POST /api/chat (Authorization: Bearer JWT)
+    API->>API: jwks_verifier (C1) + Input validation (C3)
+    API->>AC: Retrieve + Converse + Guardrail
+    AC-->>API: Grounded answer + citations
+    API->>DDB: PutItem (turn + audit)
+    API-->>SPA: JSON response + FeedbackBar (C11)
+```
+
 ## Repo Files
 - `config.env.example` — Template for non-interactive `config.env` deployments (copy to `config.env`, gitignored).
 - `deploy.sh` — Modular deployment entrypoint (writes state to gitignored `.env.lab`).
 - `teardown.sh` — Modular teardown entrypoint deleting all deployed resources in reverse dependency order.
 - `scripts/` — Composable infrastructure modules (`lib/common.sh`, `guardrail.sh`, `storage.sh`, `knowledge_base.sh`, `compute_api.sh`, `resource_group.sh`, `checks.sh`).
-- `infra/terraform/` — Modular 2-stack Terraform IaC (`modules/` + `stacks/{persistent,app}`, run inside the Podman `Containerfile`; see [NETWORK_AND_TERRAFORM.md](NETWORK_AND_TERRAFORM.md) for VPC/PrivateLink diagrams and Security Group tables).
+- `infra/terraform/` — Modular 2-stack Terraform IaC (`modules/` + `stacks/{persistent,app}` and quick-create `{knowledge,app}`, run inside the Podman `Containerfile`; see [NETWORK_AND_TERRAFORM.md](NETWORK_AND_TERRAFORM.md) for VPC/PrivateLink diagrams and Security Group tables).
+- `backend/` — TDA-aligned Clean Architecture Python backend (`domain/`, `use_cases/`, `adapters/`, `entrypoints/lambda_handler.py`) with Entra ID JWKS auth (C1), input validation (C3), redacting logger (C6), DynamoDB persistence, and feedback API (C11).
+- `agentcore_runtime/` — Bedrock AgentCore runtime adapters and use cases.
+- `frontend/` — React 19 + TypeScript + Vite SPA (`LoginPanel`, `ChatMessage`, `FeedbackBar`, `AiUsageNotice`, `authClient.js`, `ragApi.js`).
+- `docs/specs/` — Feature specifications in EARS + Design + Tasks format (see [docs/specs/sharepoint-bedrock-kb/requirements.md](specs/sharepoint-bedrock-kb/requirements.md)).
 - `lambda/handler.py` — Lambda handler calling `retrieve_and_generate` (`KB_MODE=vector`) or `retrieve` + `converse` (`KB_MODE=managed`), extracting S3/SharePoint/Web citation URLs, and writing audit logs to DynamoDB.
 - `tests/` — Offline unit, API contract, and mutation tests covering Lambda, CLI, and Bash modules (see [TESTING.md](TESTING.md)).
 - `chat_cli.py` — Interactive CLI chat client.

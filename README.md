@@ -9,6 +9,10 @@ Serverless Retrieval-Augmented Generation (RAG) chatbot built on Amazon Bedrock 
 
 ## Architecture
 
+This repository supports two deployment tracks in `eu-west-1`:
+1. **Bash Lab Prototype:** `deploy.sh` / `teardown.sh` + `lambda/handler.py` + `chat_cli.py` (`$0` idle cost).
+2. **TDA-Aligned Full-Stack App:** `frontend/` (React 19 SPA) + `backend/` (Clean Architecture Lambda with Entra ID OIDC PKCE) + `agentcore_runtime/` + `infra/terraform/` (VPC, PrivateLink, KMS, CloudFront/WAF/ALB). See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full diagrams.
+
 ```mermaid
 flowchart LR
     CLI["chat_cli.py (Local Terminal)"] -->|"POST /chat + x-api-key"| APIGW["API Gateway REST (Stage: dev / staging / prod)"]
@@ -27,10 +31,11 @@ flowchart LR
    ```bash
    cp config.env.example config.env
    ```
-3. *(Optional)* Run the local unit, contract, and mutation test suites (no AWS credentials required):
+3. *(Optional)* Run the local unit, contract, frontend, and mutation test suites (no AWS credentials required):
    ```bash
    python3 -m unittest discover -s tests -v
    python3 tests/mutation_test.py
+   cd frontend && npm test            # run `npm install && npm run build` to build the SPA
    ```
 4. Deploy the stack (discovers reusable resources from prior runs, displays a pre-deploy build plan for confirmation, deploys, and runs a post-deploy smoke test):
    ```bash
@@ -72,6 +77,7 @@ flowchart LR
 - [docs/NETWORK_LLD.md](docs/NETWORK_LLD.md) — Detailed Network Low-Level Design (IPAM, route tables, firewall/SG matrix, VPCE specs, ALB/WAF rules & sign-off checklist)
 - [docs/RUNNING_SCRIPTS.md](docs/RUNNING_SCRIPTS.md) — Podman, CloudShell, and local deployment instructions
 - [docs/TESTING.md](docs/TESTING.md) — Unit, contract, mutation, and post-deploy smoke testing guide
+- [docs/specs/sharepoint-bedrock-kb/requirements.md](docs/specs/sharepoint-bedrock-kb/requirements.md) — Feature spec (Requirements, Design, Tasks) for SharePoint → Bedrock KB
 - [infra/terraform/README.md](infra/terraform/README.md) — Quick-create 2-stack Terraform IaC reference (run via Podman)
 
 ## License
