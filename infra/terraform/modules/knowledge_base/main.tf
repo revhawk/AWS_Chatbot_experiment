@@ -119,13 +119,41 @@ resource "aws_iam_role_policy" "guardduty_malware" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect   = "Allow"
-        Action   = ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObjectTagging", "s3:ListBucket"]
+        Sid    = "AllowManagedRuleToSendS3EventsToGuardDuty"
+        Effect = "Allow"
+        Action = [
+          "events:PutRule",
+          "events:DeleteRule",
+          "events:PutTargets",
+          "events:RemoveTargets",
+          "events:DescribeRule",
+          "events:ListRules",
+          "events:TagResource",
+        ]
+        Resource = "arn:aws:events:${var.aws_region}:${var.account_id}:rule/DO-NOT-DELETE-AmazonGuardDutyMalwareProtectionS3*"
+      },
+      {
+        Sid    = "AllowGuardDutyS3MalwareScanAndNotifications"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:GetObjectVersion",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:PutObjectTagging",
+          "s3:GetObjectTagging",
+          "s3:PutObjectVersionTagging",
+          "s3:GetObjectVersionTagging",
+          "s3:ListBucket",
+          "s3:GetBucketNotification",
+          "s3:PutBucketNotification",
+        ]
         Resource = [aws_s3_bucket.source.arn, "${aws_s3_bucket.source.arn}/*"]
       },
       {
+        Sid      = "AllowKmsForGuardDutyMalwareScan"
         Effect   = "Allow"
-        Action   = ["kms:Decrypt", "kms:GenerateDataKey"]
+        Action   = ["kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey"]
         Resource = var.kms_key_arn
       },
     ]
@@ -250,8 +278,7 @@ resource "aws_bedrockagent_knowledge_base" "main" {
   storage_configuration {
     type = "S3_VECTORS"
     s3_vectors_configuration {
-      vector_bucket_arn = aws_s3vectors_vector_bucket.vectors.vector_bucket_arn
-      index_arn         = aws_s3vectors_index.whitepapers.index_arn
+      index_arn = aws_s3vectors_index.whitepapers.index_arn
     }
   }
 

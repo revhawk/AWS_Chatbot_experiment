@@ -2,7 +2,7 @@ FROM docker.io/amazon/aws-cli:latest
 
 ARG TERRAFORM_VERSION=1.10.5
 
-RUN yum install -y zip unzip curl && \
+RUN yum install -y zip unzip openssl && \
     ARCH="$(uname -m)" && \
     case "${ARCH}" in \
       x86_64) TF_ARCH="amd64" ;; \

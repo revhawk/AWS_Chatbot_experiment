@@ -47,6 +47,16 @@ resource "aws_kms_key" "main" {
           StringEquals = { "aws:SourceAccount" = var.account_id }
         }
       },
+      {
+        Sid       = "AllowS3VectorsIndexing"
+        Effect    = "Allow"
+        Principal = { Service = "indexing.s3vectors.amazonaws.com" }
+        Action    = ["kms:Decrypt", "kms:GenerateDataKey*", "kms:DescribeKey"]
+        Resource  = "*"
+        Condition = {
+          StringEquals = { "aws:SourceAccount" = var.account_id }
+        }
+      },
     ]
   })
 }

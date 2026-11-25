@@ -33,6 +33,10 @@ variable "access_logs_bucket" {
   type = string
 }
 
+data "aws_elb_service_account" "main" {}
+
+data "aws_caller_identity" "current" {}
+
 data "aws_network_interface" "execute_api" {
   for_each = toset(var.execute_api_vpce_eni_ids)
   id       = each.value
@@ -41,6 +45,53 @@ data "aws_network_interface" "execute_api" {
 data "aws_network_interface" "s3_interface" {
   for_each = toset(var.s3_interface_vpce_eni_ids)
   id       = each.value
+}
+
+# Dedicated SSE-S3 bucket for ALB access logs (AWS ALB access logs require AES256 + ELB service account policy)
+resource "aws_s3_bucket" "alb_logs" {
+  bucket        = "${var.name_prefix}-alb-logs-${data.aws_caller_identity.current.account_id}"
+  force_destroy = true
+}
+
+resource "aws_s3_bucket_public_access_block" "alb_logs" {
+  bucket                  = aws_s3_bucket.alb_logs.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "alb_logs" {
+  bucket = aws_s3_bucket.alb_logs.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "alb_logs" {
+  bucket = aws_s3_bucket.alb_logs.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "DenyInsecureTransport"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:*"
+        Resource  = [aws_s3_bucket.alb_logs.arn, "${aws_s3_bucket.alb_logs.arn}/*"]
+        Condition = { Bool = { "aws:SecureTransport" = "false" } }
+      },
+      {
+        Sid       = "AllowElbAccessLogDelivery"
+        Effect    = "Allow"
+        Principal = { AWS = data.aws_elb_service_account.main.arn }
+        Action    = "s3:PutObject"
+        Resource  = "${aws_s3_bucket.alb_logs.arn}/alb-access-logs/AWSLogs/${data.aws_caller_identity.current.account_id}/*"
+      },
+    ]
+  })
 }
 
 # --- AWS WAFv2 Web ACL (AWS Managed Rules + Rate Limiting) ---
@@ -128,10 +179,15 @@ resource "aws_lb" "internal" {
   drop_invalid_header_fields = true
 
   access_logs {
-    bucket  = var.access_logs_bucket
+    bucket  = aws_s3_bucket.alb_logs.bucket
     prefix  = "alb-access-logs"
     enabled = true
   }
+
+  depends_on = [
+    aws_s3_bucket_policy.alb_logs,
+    aws_s3_bucket_server_side_encryption_configuration.alb_logs,
+  ]
 }
 
 resource "aws_wafv2_web_acl_association" "alb" {

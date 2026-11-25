@@ -285,7 +285,7 @@ resource "aws_api_gateway_stage" "main" {
 
 resource "aws_resourcegroups_group" "stack" {
   name        = "${var.name_prefix}-rg"
-  description = "TDA-aligned AWS Bedrock RAG Assistant (${var.name_prefix})"
+  description = "TDA-aligned AWS Bedrock RAG Assistant ${var.name_prefix}"
 
   resource_query {
     type = "TAG_FILTERS_1_0"
