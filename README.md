@@ -68,9 +68,11 @@ flowchart LR
 
 - [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) — 5-minute quickstart guide (Podman, Bash, and Terraform)
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — Architectural decisions and system diagram
+- [docs/NETWORK_AND_TERRAFORM.md](docs/NETWORK_AND_TERRAFORM.md) — TDA network diagrams (Inside vs. Outside VPC), SG/VPCE tables, 2-stack Terraform runbook & network-team demo guide
+- [docs/NETWORK_LLD.md](docs/NETWORK_LLD.md) — Detailed Network Low-Level Design (IPAM, route tables, firewall/SG matrix, VPCE specs, ALB/WAF rules & sign-off checklist)
 - [docs/RUNNING_SCRIPTS.md](docs/RUNNING_SCRIPTS.md) — Podman, CloudShell, and local deployment instructions
 - [docs/TESTING.md](docs/TESTING.md) — Unit, contract, mutation, and post-deploy smoke testing guide
-- [infra/terraform/README.md](infra/terraform/README.md) — 2-stack Terraform IaC deployment (persistent `knowledge/` + ephemeral `app/`, run via Podman)
+- [infra/terraform/README.md](infra/terraform/README.md) — Quick-create 2-stack Terraform IaC reference (run via Podman)
 
 ## License
 

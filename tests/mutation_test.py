@@ -16,6 +16,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 PYTHON_TARGETS = [
     ("lambda/handler.py", ["tests.test_handler"]),
     ("chat_cli.py", ["tests.test_cli"]),
+    ("backend/domain/entities.py", ["tests.test_clean_backend"]),
+    ("backend/use_cases/ask_question.py", ["tests.test_clean_backend"]),
+    ("backend/use_cases/submit_feedback.py", ["tests.test_clean_backend"]),
+    ("backend/adapters/auth/jwks_verifier.py", ["tests.test_clean_backend"]),
+    ("backend/adapters/controllers/apigw_controller.py", ["tests.test_clean_backend"]),
+    ("agentcore_runtime/use_cases.py", ["tests.test_clean_backend"]),
 ]
 
 BASH_TARGETS = [
