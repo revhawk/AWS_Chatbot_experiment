@@ -22,6 +22,7 @@ PYTHON_TARGETS = [
     ("backend/adapters/auth/jwks_verifier.py", ["tests.test_clean_backend"]),
     ("backend/adapters/controllers/apigw_controller.py", ["tests.test_clean_backend"]),
     ("agentcore_runtime/use_cases.py", ["tests.test_clean_backend"]),
+    ("agentcore_runtime/sharepoint_acl_mock.py", ["tests.test_sharepoint_x509_acl"]),
 ]
 
 BASH_TARGETS = [
@@ -33,6 +34,7 @@ BASH_TARGETS = [
     ("scripts/resource_group.sh", ["tests.test_scripts"]),
     ("scripts/checks.sh", ["tests.test_scripts"]),
     ("scripts/smoke_test_tf.sh", ["tests.test_scripts"]),
+    ("scripts/mock_sharepoint_x509.sh", ["tests.test_sharepoint_x509_acl"]),
     ("deploy.sh", ["tests.test_scripts"]),
     ("teardown.sh", ["tests.test_scripts"]),
 ]
